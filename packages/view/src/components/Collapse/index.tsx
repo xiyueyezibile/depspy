@@ -13,42 +13,43 @@ export default function Collapse() {
   async function dfs(roots: Node[]) {
     const deps: Node[] = [];
     function dfsKid(node: Node) {
-      if(!node || !node.dependencies) return;
+      if (!node || !node.dependencies) return;
       if (Object.values(node.dependencies).length === 0) {
-
         deps.push(node);
         return;
       }
-      for (let v of Object.values(node.dependencies)) {
+      for (const v of Object.values(node.dependencies)) {
         dfsKid(v);
       }
     }
     for (const root of roots) {
       dfsKid(root);
     }
-    const d = (await Promise.all(
-      Object.values(deps)
-        .filter((dep) => Object.values((dep as any).dependenciesList).length)
-        .map(async (dep) => {
-          const res = await getNode({
-            id: dep.name + dep.declarationVersion,
-            depth: 3,
-            path: dep.path ? dep.path : "",
-          });
-          dep.dependencies = res.data.dependencies;
+    const d = (
+      await Promise.all(
+        Object.values(deps)
+          .filter((dep) => Object.values(dep.dependenciesList).length)
+          .map(async (dep) => {
+            const res = await getNode({
+              id: dep.path[dep.path.length - 1] + dep.declarationVersion,
+              depth: 10,
+              path: dep.path ? dep.path : undefined,
+            });
+            dep.dependencies = res.data.dependencies;
 
-          return dep;
-        }),
-    )).filter(dep => dep && dep.dependencies && Object.values(dep.dependencies).length);
-    console.log(d.length, Object.values(deps).length);
-    
+            return dep;
+          }),
+      )
+    ).filter(
+      (dep) =>
+        dep && dep.dependencies && Object.values(dep.dependencies).length,
+    );
 
     if (d.length) {
       dfs(d); // 递归
       return;
     }
     setRoot({ ...root });
-    setCollapse(!collapse);
   }
   return (
     <section
@@ -60,10 +61,13 @@ export default function Collapse() {
       <div
         onClick={async () => {
           if (collapse) {
-            await dfs([root]);
-          } else {
+            if (import.meta.env.VITE_BUILD_MODE === "offline") {
+              await dfs([root]);
+            }
             setCollapse(!collapse);
+            return;
           }
+          setCollapse(!collapse);
         }}
         className={`
           ${

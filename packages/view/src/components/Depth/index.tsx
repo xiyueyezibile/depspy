@@ -9,7 +9,8 @@ export default function Depth() {
     shallow,
   );
   const { t } = useLanguage();
-  const [, setSearchParams] = useSearchParams()
+  const [, setSearchParams] = useSearchParams();
+
   return (
     <section
       id={`${t("section.maxDepth")}`}
@@ -26,9 +27,24 @@ export default function Depth() {
           min={1}
           defaultValue={depth}
           onBlur={(e) => {
+            const newDepth = parseInt(e.target.value);
+            if (newDepth < 2) {
+              e.target.value = String(depth);
+              return;
+            }
+            if (newDepth === depth) {
+              return;
+            }
             setRootLoading(true);
             setDepth(parseInt(e.target.value));
-            setSearchParams({ depth: e.target.value })
+            const query = new URLSearchParams(window.location.search);
+
+            const q = query.get("q");
+            if (q) {
+              setSearchParams({ depth: e.target.value, q });
+              return;
+            }
+            setSearchParams({ depth: e.target.value });
           }}
           className="p-1 h-2rem w-5rem outline-primary-base text-center text-text bg-bg-container"
           border="solid 2 rd-0.5rem primary-border-hover hover:primary-hover"
