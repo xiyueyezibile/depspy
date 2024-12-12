@@ -36,26 +36,26 @@ class ModuleGraph {
             const importedIds = this.importedIds.get(id);
             module.importedIds = importedIds.map(item => {
                 return this.graph.get(item)
-            });
+            }).filter(Boolean);
         }
         if(this.dynamicallyImportedIds.has(id)) {
             const dynamicallyImportedIds = this.dynamicallyImportedIds.get(id);
             module.dynamicallyImportedIds = dynamicallyImportedIds.map(item => {
                 return this.graph.get(item)
             }
-            )
+            ).filter(Boolean)
         }
         if(this.importers.has(id)) {
             const importers = this.importers.get(id);
             module.importers = importers.map(item => {
                 return this.graph.get(item)
-            })
+            }).filter(Boolean)
         }
         if(this.dynamicImporters.has(id)) {
             const dynamicImporters = this.dynamicImporters.get(id);
             module.dynamicImporters = dynamicImporters.map(item => {
                 return this.graph.get(item)
-            })
+            }).filter(Boolean)
         }
     })
   }
@@ -83,13 +83,17 @@ class Bundle {
   /** 获取编译阶段模块 */
   resolveLoadModule(id: string) {
     if (!id.includes("node_modules")) {
+        
       this.loadModules.set(id, id)
+        
     }
   }
   /** 寻找在编译模块和实际模块都存在的模块 */
   findLoadModuleWithOriginModule() {
     const result = {};
-    Object.keys(this.loadModules).forEach((id) => {
+    
+    this.loadModules.forEach((module,id) => {
+        
         if(this.originModules.has(id)) {
             result[id] = this.originModules.get(id);
         }
@@ -121,6 +125,7 @@ export function vitePluginInsight(): Plugin {
       globleBundle.resolveOriginModuleByBundle(bundle, this);
       const map = globleBundle.findLoadModuleWithOriginModule();
       globleBundle.newModuleByMap(map);
+      
         // 拿到moduleGraph
       const moduleGraph = globleBundle.moduleGraph;
         // 获取所以导入导出关系
@@ -135,6 +140,8 @@ export function vitePluginInsight(): Plugin {
       })
       /** 根据导入导出关系构建模块依赖图 */
       moduleGraph.buildGraph();
+      console.log(moduleGraph.graph);
+      
     },
   };
 }
