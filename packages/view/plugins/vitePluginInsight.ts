@@ -24,7 +24,9 @@ class ModuleGraph {
   /** key导入value */
   importedIds = new Map<string,readonly string[]>();
   dynamicallyImportedIds = new Map<string,readonly string[]>();
-  constructor(map: Record<string, any>) {
+  bundle: Bundle;
+  constructor(bundle: Bundle,map: Record<string, any>) {
+    this.bundle = bundle;
     Object.entries(map).forEach(([key, value]) => {
         this.graph.set(key, new Module(key))
     })
@@ -102,7 +104,7 @@ class Bundle {
   }
   /** 根据map生产moduleGraph */
   newModuleByMap(map: Record<string, any>) {
-    this.moduleGraph = new ModuleGraph(map);
+    this.moduleGraph = new ModuleGraph(this,map);
   }
 
 }
