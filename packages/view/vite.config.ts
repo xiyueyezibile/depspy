@@ -4,6 +4,7 @@ import UnoCSS from "unocss/vite";
 import path from "path";
 import generate404 from "./plugins/generate404";
 import neutralization from "./plugins/neutralization";
+import { vitePluginInsight } from "plugins/vitePluginInsight";
 export default defineConfig(({ mode }) => {
   const { VITE_BUILD_MODE } = loadEnv(mode, path.join(process.cwd(), "env"));
   return {
@@ -33,6 +34,9 @@ export default defineConfig(({ mode }) => {
         "os",
         "events",
       ]),
+      vitePluginInsight({
+        root: path.join(__dirname, "../view/src/main.tsx"),
+      })
     ],
     resolve: {
       alias: {
