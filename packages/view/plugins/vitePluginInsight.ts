@@ -1,4 +1,5 @@
 
+import { writeFileSync } from "fs";
 import { Plugin } from "vite";
 
 
@@ -9,6 +10,20 @@ function idInExternals(id: string) {
   return externals.some((external) => id.includes(external))
 }
 
+function logCircleModules(circleModules: Module[]) {
+    const str = circleModules.map((module) => module.id).join(" -> ")
+    console.log(`Circular dependency detected: ${str}`)
+}
+
+interface ModuleTree {
+    children?: ModuleTree[]
+    parentId?: string
+    id: string
+    circleIds: string[][]
+    depth: number
+    path: string[]
+}
+
 class Module {
   id: string;
   /** key的导入者value */
@@ -17,7 +32,7 @@ class Module {
   /** key导入value */
   importedIds: Module[] = [];
   dynamicallyImportedIds: Module[] = [];
-  circleModules: Module[] | null = null;
+  circleModules= new Map<string, Module[]>();
   constructor(id: string) {
     this.id = id;
   }
@@ -61,6 +76,14 @@ class ModuleGraph {
     if(index === -1) return null;
     return modules.slice(index);
   }
+  static pathInCirclePath(path: string[], circlePath: string[]) {
+    for(let i = 1; i <= circlePath.length; i++) {
+        if(path.join('&').endsWith(circlePath.slice(0, i).join('&'))) {
+            return true;
+        }
+    }
+    return false
+  }
   buildGraph() {
     this.graph.forEach((module, key) => {
         const id = module.id;
@@ -98,9 +121,14 @@ class ModuleGraph {
         // 发现循环依赖
         if(matchModules && matchModules.length && ModuleGraph.hasDuplicate(matchModules)) {
             const circleModule = ModuleGraph.getDuplicate(matchModules)
-            if(circleModule) circleModule.circleModules = ModuleGraph.subarrayFromFirstMatch(circleModule, matchModules)
-            console.log('start',circleModule.circleModules[0]);
-            
+            if(circleModule) {
+                const firstModules = ModuleGraph.subarrayFromFirstMatch(circleModule, matchModules)
+                const key = firstModules.map(it => it.id).join('&')
+                
+                // 去重
+                if(!circleModule.circleModules.has(key)) circleModule.circleModules.set(key,firstModules)
+            }
+                // logCircleModules(circleModule.circleModules)
             return
         }
         const rootModule = this.graph.get(matchModules && matchModules.length? matchModules[matchModules.length - 1].id :rootId);
@@ -114,9 +142,55 @@ class ModuleGraph {
         })
     }
   }
+  transform(rootId: string = this.rootId, depth: number = 9999, parent: ModuleTree | null = null, circleIds: string[][] = []): ModuleTree | null {
+    const tree: ModuleTree = {
+        parentId: parent? parent.id : undefined,
+        id: rootId,
+        depth: parent? parent.depth + 1 : 0,
+        circleIds: [],
+        path: parent? [...parent.path, rootId]: [rootId],
+    }
+
+    // 走到循环节点最后一个进行截断
+    if(circleIds.length >= 1 && circleIds.filter(circle => {
+        return tree.path.join('&').includes(circle.join('&'))
+    }).length) {
+        return tree
+    }
+    // depth = 0 停止向下遍历
+    if(depth === 0) return tree
+    if(this.graph.has(rootId)) {
+        const rootModule = this.graph.get(rootId);
+         rootModule.circleModules.forEach(modules => {
+            tree.circleIds.push(modules.map(module => module.id))
+        })
+
+        // 遍历导入模块
+        tree.children = rootModule.importedIds.map(module => {
+            let kid: ModuleTree | null = null
+            kid = this.transform(module.id, depth - 1, tree, [...tree.circleIds, ...circleIds].filter((item) => ModuleGraph.pathInCirclePath(tree.path, item)))
+            if(kid) {
+                kid.parentId = tree.id
+                kid.depth = tree.depth + 1
+                kid.path = [...tree.path, kid.id]
+            }
+            return kid
+        }).filter(Boolean)
+        return tree
+    }
+    return tree
+  }
   genarateTreeByRootId(rootId: string = this.rootId) {
     if(this.graph.has(rootId)) {
         const rootModule = this.graph.get(rootId);
+        return rootModule;
+    }
+    return null
+  }
+  stringifyTreeByRootId(rootId: string = this.rootId) {
+    if(this.graph.has(rootId)) {
+        const rootTree = this.transform(rootId);
+        return JSON.stringify(rootTree, null, 2)
     }
   }
 }
@@ -127,7 +201,7 @@ class Bundle {
   originModules = new Map<string, any>();
   /** 加载模块 */
   loadModules = new Map<string, any>();
-  
+  noBundleModules = new Map<string, any>();
   
   constructor() {
   }
@@ -157,6 +231,8 @@ class Bundle {
         
         if(this.originModules.has(id)) {
             result[id] = this.originModules.get(id);
+        } else {
+            this.noBundleModules.set(id, module);
         }
     })
     return result;
@@ -204,6 +280,7 @@ export function vitePluginInsight(options: {
       /** 根据导入导出关系构建模块依赖图 */
       moduleGraph.buildGraph();
       moduleGraph.analyseCircleModule(options.root)
+      writeFileSync("./a.json", moduleGraph.stringifyTreeByRootId(options.root));
     },
   };
 }
