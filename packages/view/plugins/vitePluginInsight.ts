@@ -1,8 +1,14 @@
 
-import { writeFileSync } from "fs";
+import { existsSync, unlinkSync, writeFileSync } from "fs";
+import path from 'path'
 import { Plugin } from "vite";
 
 
+
+interface Config {
+  root: string;
+  entry?: string;
+}
 
 const externals = ["node_modules", "css", "sass", "less"]
 
@@ -19,6 +25,8 @@ interface ModuleTree {
     children?: ModuleTree[]
     parentId?: string
     id: string
+    pathId: string
+    name: string
     circleIds: string[][]
     depth: number
     path: string[]
@@ -47,7 +55,9 @@ class ModuleGraph {
   importedIds = new Map<string,readonly string[]>();
   dynamicallyImportedIds = new Map<string,readonly string[]>();
   bundle: Bundle;
+  entryId: string;
   rootId: string;
+  private _moduleIds = new Map<string, number>();
   constructor(bundle: Bundle,map: Record<string, any>) {
     this.bundle = bundle;
     Object.entries(map).forEach(([key, value]) => {
@@ -116,8 +126,8 @@ class ModuleGraph {
     })
   }
   /** 分析并标记循环依赖 */
-  analyseCircleModule(rootId: string = this.rootId, matchModules: Module[] | null = null) {
-    if(this.graph.has(rootId)) {
+  analyseCircleModule(entryId: string = this.entryId, matchModules: Module[] | null = null) {
+    if(this.graph.has(entryId)) {
         // 发现循环依赖
         if(matchModules && matchModules.length && ModuleGraph.hasDuplicate(matchModules)) {
             const circleModule = ModuleGraph.getDuplicate(matchModules)
@@ -131,24 +141,37 @@ class ModuleGraph {
                 // logCircleModules(circleModule.circleModules)
             return
         }
-        const rootModule = this.graph.get(matchModules && matchModules.length? matchModules[matchModules.length - 1].id :rootId);
+        const rootModule = this.graph.get(matchModules && matchModules.length? matchModules[matchModules.length - 1].id :entryId);
         const importedIds = rootModule.importedIds;
         const dynamicallyImportedIds = rootModule.dynamicallyImportedIds;
         const allImportedIds = [...importedIds, ...dynamicallyImportedIds];
         // 多叉树深度优先遍历
         allImportedIds.forEach(module => {
             
-            this.analyseCircleModule(rootId, matchModules ? [...matchModules, module] : [rootModule, module])
+            this.analyseCircleModule(entryId, matchModules ? [...matchModules, module] : [rootModule, module])
         })
     }
   }
-  transform(rootId: string = this.rootId, depth: number = 9999, parent: ModuleTree | null = null, circleIds: string[][] = []): ModuleTree | null {
+  
+  transform(entryId: string = this.entryId ,depth: number = 9999, parent: ModuleTree | null = null, circleIds: string[][] = []): ModuleTree | null {
+    let id = entryId
+    if(this._moduleIds.has(entryId)) {
+      const newValue = this._moduleIds.get(entryId) + 1
+      this._moduleIds.set(entryId, newValue)
+      id = `${entryId}-${newValue}`
+    } else {
+      this._moduleIds.set(entryId, 1)
+      id = `${entryId}-1`
+    }
     const tree: ModuleTree = {
         parentId: parent? parent.id : undefined,
-        id: rootId,
+        id: id,
+        pathId: entryId,
         depth: parent? parent.depth + 1 : 0,
+        name: entryId.slice(this.rootId.length),
+        children: [],
         circleIds: [],
-        path: parent? [...parent.path, rootId]: [rootId],
+        path: parent? [...parent.path, entryId]: [entryId],
     }
 
     // 走到循环节点最后一个进行截断
@@ -159,10 +182,28 @@ class ModuleGraph {
     }
     // depth = 0 停止向下遍历
     if(depth === 0) return tree
-    if(this.graph.has(rootId)) {
-        const rootModule = this.graph.get(rootId);
+    if(this.graph.has(entryId)) {
+        const rootModule = this.graph.get(entryId);
          rootModule.circleModules.forEach(modules => {
             tree.circleIds.push(modules.map(module => module.id))
+        })
+        // 排除后来的循环模块被先来的循环模块截断的情况
+        circleIds.forEach(circle => {
+          tree.circleIds = tree.circleIds.filter(item => {
+            let i = circle.indexOf(item[0])
+            if(i !== -1) {
+              let j = 1;
+              for(let m = i + 1; m < circle.length; m++) {
+                // 出现不一致代表不存在被截断情况，返回
+                if(!item[j] || item[j] !== circle[m]) {
+                  return true; 
+                }
+              }
+            }
+            console.log(circle, item);
+            
+            return false;
+          })
         })
 
         // 遍历导入模块
@@ -172,7 +213,7 @@ class ModuleGraph {
             if(kid) {
                 kid.parentId = tree.id
                 kid.depth = tree.depth + 1
-                kid.path = [...tree.path, kid.id]
+                kid.path = [...tree.path, kid.pathId]
             }
             return kid
         }).filter(Boolean)
@@ -180,16 +221,16 @@ class ModuleGraph {
     }
     return tree
   }
-  genarateTreeByRootId(rootId: string = this.rootId) {
-    if(this.graph.has(rootId)) {
-        const rootModule = this.graph.get(rootId);
+  genarateTreeByRootId(entryId: string = this.entryId) {
+    if(this.graph.has(entryId)) {
+        const rootModule = this.graph.get(entryId);
         return rootModule;
     }
     return null
   }
-  stringifyTreeByRootId(rootId: string = this.rootId) {
-    if(this.graph.has(rootId)) {
-        const rootTree = this.transform(rootId);
+  stringifyTreeByRootId(entryId: string = this.entryId) {
+    if(this.graph.has(entryId)) {
+        const rootTree = this.transform(entryId);
         return JSON.stringify(rootTree, null, 2)
     }
   }
@@ -203,16 +244,14 @@ class Bundle {
   loadModules = new Map<string, any>();
   noBundleModules = new Map<string, any>();
   
-  constructor() {
+  constructor(options: Config) {
+    const jsonName = 'moduleTree.json'
+    const jsonPath = path.join(options.root,jsonName)
+    if(!existsSync(jsonPath)) writeFileSync(jsonPath, JSON.stringify([], null, 2));
   }
   /** 获取实际被打包的模块 */
-  resolveOriginModuleByBundle(bundle) {
-    const distLists = Object.values(bundle);
-    distLists.forEach((dist) => {
-      Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
-        this.originModules.set(id, data)
-      });
-    });
+  resolveOriginModuleByBundle(fn: (originModule: Map<string, any>) => void) {
+    fn(this.originModules)
   }
   /** 获取编译阶段模块 */
   resolveLoadModule(id: string) {
@@ -244,16 +283,14 @@ class Bundle {
 
 }
 
-export function vitePluginInsight(options: {
-    root?: string;
-}): Plugin {
+export function vitePluginInsight(options: Config): Plugin {
     /** 全局保存 */
   let globleBundle: Bundle;
   return {
     name: "vite-plugin-insight",
     configResolved() {
         // 初始化
-      globleBundle = new Bundle();
+      globleBundle = new Bundle(options);
     },
     load(id) {
       globleBundle.resolveLoadModule(id);
@@ -261,12 +298,21 @@ export function vitePluginInsight(options: {
     generateBundle(_, bundle) {
         
       // 根据bundle获取实际被打包的模块
-      globleBundle.resolveOriginModuleByBundle(bundle);
+      globleBundle.resolveOriginModuleByBundle((originModules) => {
+        const distLists = Object.values(bundle);
+        distLists.forEach((dist) => {
+          Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
+            originModules.set(id, data)
+          });
+        });
+      });
       const map = globleBundle.findLoadModuleWithOriginModule();
       globleBundle.newModuleByMap(map);
       
         // 拿到moduleGraph
       const moduleGraph = globleBundle.moduleGraph;
+      moduleGraph.rootId = options.root;
+      moduleGraph.entryId = options.entry;
         // 获取所以导入导出关系
       Object.keys(map).forEach((id) => {
         const info = this.getModuleInfo(id);
@@ -279,8 +325,18 @@ export function vitePluginInsight(options: {
       })
       /** 根据导入导出关系构建模块依赖图 */
       moduleGraph.buildGraph();
-      moduleGraph.analyseCircleModule(options.root)
-      writeFileSync("./a.json", moduleGraph.stringifyTreeByRootId(options.root));
+      moduleGraph.analyseCircleModule(options.entry)
+      const jsonName = 'moduleTree.json'
+      const jsonPath = path.join(options.root,jsonName)
+       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId(options.entry));
+      // bundle[jsonName] = {
+      //   type: 'asset',
+      //   fileName: jsonName,
+      //   name: jsonName,
+      //   source: moduleGraph.stringifyTreeByRootId(options.entry),
+      //   needsCodeReference: false,
+      // }
+      // unlinkSync(jsonPath);
     },
   };
 }

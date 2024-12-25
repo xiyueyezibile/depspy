@@ -35,7 +35,8 @@ export default defineConfig(({ mode }) => {
         "events",
       ]),
       vitePluginInsight({
-        root: path.join(__dirname, "../view/src/main.tsx"),
+        entry: path.join(__dirname, "../view/src/main.tsx"),
+        root: process.cwd(), // 项目根目录
       })
     ],
     resolve: {

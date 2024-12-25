@@ -4,8 +4,8 @@ import { useStaticStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 export default function StaticTree() {
   const { staticRoot } = useStaticStore();
-  useEffect(() => {
-    if (!staticRoot) return;
+  function G6RegisterNode() {
+    // 注册module节点
     G6.registerNode(
       "tree-node",
       {
@@ -65,6 +65,7 @@ export default function StaticTree() {
       },
       "single-node",
     );
+    // 注册线节点
     G6.registerEdge("custom-polyline", {
       draw(cfg, group) {
         const startPoint = cfg.startPoint;
@@ -86,6 +87,30 @@ export default function StaticTree() {
         return shape;
       },
     });
+    // 注册循环线节点
+    G6.registerEdge('circle-line', {
+      draw(cfg, group) {
+        const { startPoint, endPoint } = cfg;
+        console.log(cfg);
+        
+        const shape = group.addShape('line', {
+          attrs: {
+            x1: startPoint.x,
+            y1: startPoint.y,
+            x2: endPoint.x,
+            y2: endPoint.y,
+            stroke: '#FFF', // 黑色直线
+            lineWidth: 2, // 线宽
+          },
+          name: 'circle-line-path',
+        });
+        return shape;
+      },
+    });
+  }
+  useEffect(() => {
+    if (!staticRoot) return;
+    G6RegisterNode();
     const container = document.getElementById("container");
     const width = container.scrollWidth;
     const height = container.scrollHeight || 500;
@@ -109,6 +134,7 @@ export default function StaticTree() {
               // 若当前操作的节点 id 为 'node1'，则不发生 collapse-expand
               if (e.target && e.target.cfg.name === "collapse-icon")
                 return true;
+
               return false;
             },
           },
@@ -140,15 +166,37 @@ export default function StaticTree() {
         },
       },
     });
+    const pathById = new Map();
     //转换为g6的数据格式
     G6.Util.traverseTree(staticRoot, (subTree) => {
-      subTree.children = Object.values(subTree.dependencies || {});
+      
+      if(subTree.circleIds.length) {
+        subTree.circleIds.forEach(((circleId, i) => {
+          let source = subTree;
+          for(let j = 1; j < circleId.length; j++) {
+            console.log(source, circleId[j]);
+            
+            source = source?.children.filter((it) => it.pathId === circleId[j])[0];
+          }
+        
+        graph.addItem('edge', {
+          source: source.id, // 替换为真实的节点ID
+          target: subTree.id, // 替换为真实的节点ID
+          type: 'circle-line', // 使用你需要的边类型
+        });
+        }))
+        
+      }
       return true;
     });
     graph.data(staticRoot);
     graph.render();
     graph.fitView();
 
+    
+  }, [staticRoot]);
+
+  useEffect(() => {
     if (typeof window !== "undefined")
       window.onresize = () => {
         if (!graph || graph.get("destroyed")) return;
@@ -156,7 +204,7 @@ export default function StaticTree() {
           return;
         graph.changeSize(container.scrollWidth, container.scrollHeight);
       };
-  }, [staticRoot]);
+  }, [])
 
   return <div id="container" className="w-100vw h-100vh"></div>;
 }
