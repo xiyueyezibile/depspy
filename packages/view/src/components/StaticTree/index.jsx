@@ -22,7 +22,7 @@ export default function StaticTree() {
             // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
             name: "rect-shape",
           });
-          const content = textOverflow(cfg.path, 100);
+          const content = textOverflow(cfg.name, 100);
           const text = group.addShape("text", {
             attrs: {
               text: content,
@@ -95,11 +95,11 @@ export default function StaticTree() {
         
         const shape = group.addShape('line', {
           attrs: {
-            x1: startPoint.x,
-            y1: startPoint.y,
-            x2: endPoint.x,
-            y2: endPoint.y,
-            stroke: '#FFF', // 黑色直线
+            x1: startPoint.x - 50,
+            y1: startPoint.y - 10,
+            x2: endPoint.x + 50,
+            y2: endPoint.y - 10,
+            stroke: 'red', // 黑色直线
             lineWidth: 2, // 线宽
           },
           name: 'circle-line-path',
@@ -166,31 +166,29 @@ export default function StaticTree() {
         },
       },
     });
-    const pathById = new Map();
+    const circleMap = new Map();
     //转换为g6的数据格式
     G6.Util.traverseTree(staticRoot, (subTree) => {
-      
-      if(subTree.circleIds.length) {
-        subTree.circleIds.forEach(((circleId, i) => {
-          let source = subTree;
-          for(let j = 1; j < circleId.length; j++) {
-            console.log(source, circleId[j]);
-            
-            source = source?.children.filter((it) => it.pathId === circleId[j])[0];
+      if(new Set(subTree.path).size !== subTree.path.length) {
+        for(const v of subTree.idpath) {
+          const arr = v.split('-')
+          if(arr.slice(0, arr.length - 1).join('-') === subTree.pathId) {
+            circleMap.set(v, subTree.id)
           }
-        
-        graph.addItem('edge', {
-          source: source.id, // 替换为真实的节点ID
-          target: subTree.id, // 替换为真实的节点ID
-          type: 'circle-line', // 使用你需要的边类型
-        });
-        }))
-        
+        }
       }
       return true;
     });
     graph.data(staticRoot);
+    
     graph.render();
+    circleMap.forEach((v, k) => {
+      graph.addItem('edge', {
+        source: k,
+        target: v,
+        type: 'circle-line',
+      })
+    })
     graph.fitView();
 
     

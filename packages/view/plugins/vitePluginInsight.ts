@@ -27,9 +27,10 @@ interface ModuleTree {
     id: string
     pathId: string
     name: string
-    circleIds: string[][]
+    // circleIds: string[][]
     depth: number
     path: string[]
+    idpath: string[]
 }
 
 class Module {
@@ -86,14 +87,7 @@ class ModuleGraph {
     if(index === -1) return null;
     return modules.slice(index);
   }
-  static pathInCirclePath(path: string[], circlePath: string[]) {
-    for(let i = 1; i <= circlePath.length; i++) {
-        if(path.join('&').endsWith(circlePath.slice(0, i).join('&'))) {
-            return true;
-        }
-    }
-    return false
-  }
+
   buildGraph() {
     this.graph.forEach((module, key) => {
         const id = module.id;
@@ -153,7 +147,7 @@ class ModuleGraph {
     }
   }
   
-  transform(entryId: string = this.entryId ,depth: number = 9999, parent: ModuleTree | null = null, circleIds: string[][] = []): ModuleTree | null {
+  transform(entryId: string = this.entryId ,depth: number = 9999, parent: ModuleTree | null = null): ModuleTree | null {
     let id = entryId
     if(this._moduleIds.has(entryId)) {
       const newValue = this._moduleIds.get(entryId) + 1
@@ -170,50 +164,29 @@ class ModuleGraph {
         depth: parent? parent.depth + 1 : 0,
         name: entryId.slice(this.rootId.length),
         children: [],
-        circleIds: [],
+        idpath: parent? [...parent.idpath, id] : [id],
+        // circleIds: [],
         path: parent? [...parent.path, entryId]: [entryId],
     }
 
-    // 走到循环节点最后一个进行截断
-    if(circleIds.length >= 1 && circleIds.filter(circle => {
-        return tree.path.join('&').includes(circle.join('&'))
-    }).length) {
-        return tree
-    }
     // depth = 0 停止向下遍历
     if(depth === 0) return tree
+    // 发现循环路径
+    if(new Set(tree.path).size !== tree.path.length) {
+      return tree
+    }
     if(this.graph.has(entryId)) {
         const rootModule = this.graph.get(entryId);
-         rootModule.circleModules.forEach(modules => {
-            tree.circleIds.push(modules.map(module => module.id))
-        })
-        // 排除后来的循环模块被先来的循环模块截断的情况
-        circleIds.forEach(circle => {
-          tree.circleIds = tree.circleIds.filter(item => {
-            let i = circle.indexOf(item[0])
-            if(i !== -1) {
-              let j = 1;
-              for(let m = i + 1; m < circle.length; m++) {
-                // 出现不一致代表不存在被截断情况，返回
-                if(!item[j] || item[j] !== circle[m]) {
-                  return true; 
-                }
-              }
-            }
-            console.log(circle, item);
-            
-            return false;
-          })
-        })
 
         // 遍历导入模块
         tree.children = rootModule.importedIds.map(module => {
             let kid: ModuleTree | null = null
-            kid = this.transform(module.id, depth - 1, tree, [...tree.circleIds, ...circleIds].filter((item) => ModuleGraph.pathInCirclePath(tree.path, item)))
+            kid = this.transform(module.id, depth - 1, tree)
             if(kid) {
                 kid.parentId = tree.id
                 kid.depth = tree.depth + 1
                 kid.path = [...tree.path, kid.pathId]
+                kid.idpath = [...tree.idpath, kid.id]
             }
             return kid
         }).filter(Boolean)
@@ -296,6 +269,7 @@ export function vitePluginInsight(options: Config): Plugin {
       globleBundle.resolveLoadModule(id);
     },
     generateBundle(_, bundle) {
+        console.log('执行了');
         
       // 根据bundle获取实际被打包的模块
       globleBundle.resolveOriginModuleByBundle((originModules) => {
@@ -303,6 +277,7 @@ export function vitePluginInsight(options: Config): Plugin {
         distLists.forEach((dist) => {
           Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
             originModules.set(id, data)
+            
           });
         });
       });
