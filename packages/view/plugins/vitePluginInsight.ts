@@ -157,12 +157,13 @@ class ModuleGraph {
       this._moduleIds.set(entryId, 1)
       id = `${entryId}-1`
     }
+    const nameArr = entryId.split(path.sep)
     const tree: ModuleTree = {
         parentId: parent? parent.id : undefined,
         id: id,
         pathId: entryId,
         depth: parent? parent.depth + 1 : 0,
-        name: entryId.slice(this.rootId.length),
+        name: nameArr.slice(nameArr.length >= 2? nameArr.length - 2: 0).join('/'),
         children: [],
         idpath: parent? [...parent.idpath, id] : [id],
         // circleIds: [],
@@ -276,7 +277,10 @@ export function vitePluginInsight(options: Config): Plugin {
         const distLists = Object.values(bundle);
         distLists.forEach((dist) => {
           Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
-            originModules.set(id, data)
+            if(!idInExternals(id)) {
+              originModules.set(id, data)
+              
+            }
             
           });
         });
@@ -291,7 +295,10 @@ export function vitePluginInsight(options: Config): Plugin {
         // 获取所以导入导出关系
       Object.keys(map).forEach((id) => {
         const info = this.getModuleInfo(id);
-        if(info) {
+        console.log(info,info.isIncluded);
+        
+        
+        if(info && info.isIncluded) {
             moduleGraph.importers.set(info.id, info.importers)
             moduleGraph.importedIds.set(info.id, info.importedIds)
             moduleGraph.dynamicImporters.set(info.id, info.dynamicImporters)

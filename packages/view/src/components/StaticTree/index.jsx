@@ -91,14 +91,13 @@ export default function StaticTree() {
     G6.registerEdge('circle-line', {
       draw(cfg, group) {
         const { startPoint, endPoint } = cfg;
-        console.log(cfg);
         
         const shape = group.addShape('line', {
           attrs: {
-            x1: startPoint.x - 50,
-            y1: startPoint.y - 10,
-            x2: endPoint.x + 50,
-            y2: endPoint.y - 10,
+            x1: startPoint.x,
+            y1: startPoint.y,
+            x2: endPoint.x,
+            y2: endPoint.y,
             stroke: 'red', // 黑色直线
             lineWidth: 2, // 线宽
           },
