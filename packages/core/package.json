@@ -7,6 +7,11 @@
     ".": {
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./vitePluginInsight": {
+      "import": "./dist/static/vitePluginInsight.mjs",
+      "require": "./dist/static/vitePluginInsight.js",
+      "types": "./dist/static/vitePluginInsight.d.mts"
     }
   },
   "private": false,

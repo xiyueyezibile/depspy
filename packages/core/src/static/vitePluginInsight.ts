@@ -1,7 +1,6 @@
 
-import { existsSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import path from 'path'
-import { Plugin } from "vite";
 
 
 
@@ -257,7 +256,7 @@ class Bundle {
 
 }
 
-export function vitePluginInsight(options: Config): Plugin {
+export function vitePluginInsight(options: Config): any{
     /** 全局保存 */
   let globleBundle: Bundle;
   return {
@@ -295,7 +294,6 @@ export function vitePluginInsight(options: Config): Plugin {
         // 获取所以导入导出关系
       Object.keys(map).forEach((id) => {
         const info = this.getModuleInfo(id);
-        console.log(info,info.isIncluded);
         
         
         if(info && info.isIncluded) {
