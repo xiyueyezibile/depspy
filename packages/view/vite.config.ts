@@ -34,13 +34,13 @@ export default defineConfig(({ mode }) => {
         "os",
         "events",
         "fs",
-        "path"
+        "path",
       ]),
       vitePluginInsight({
         entry: path.join(__dirname, "../view/src/main.tsx"),
         root: process.cwd(), // 项目根目录
         pkgPath: path.join(process.cwd(), "/package.json"), // package.json 路径
-      })
+      }),
     ],
     resolve: {
       alias: {

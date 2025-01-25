@@ -3,21 +3,19 @@ import { GithubIcon, LanguageIcon, ThemeIcon } from "@/components/icon";
 import Skeleton from "@/components/Skeleton";
 import StaticTree from "@/components/StaticTree";
 import { useStaticStore } from "@/contexts";
-import moduleTree from '../../../moduleTree.json'
+import moduleTree from "../../../moduleTree.json";
 import { useEffect } from "react";
 
 export default function StaticAnalyzePage() {
   const { staticRootLoading, staticRoot, setStaticRoot } = useStaticStore();
   async function init() {
-    const tree = moduleTree
+    const tree = moduleTree;
 
-    
-    setStaticRoot(tree)
+    setStaticRoot(tree);
   }
   useEffect(() => {
-    init()
-    
-  }, [])
+    init();
+  }, []);
   if (staticRootLoading && !staticRoot) {
     return <Skeleton></Skeleton>;
   }
