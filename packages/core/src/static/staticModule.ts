@@ -4,7 +4,6 @@ import path from "path";
 export interface Config {
   root: string;
   entry?: string;
-  pkgPath?: string;
 }
 
 export const externals = ["node_modules"];
@@ -17,13 +16,7 @@ export function idInExternals(id: string) {
   });
 }
 
-export function getExternalName(id: string) {
-  if (!idInExternals(id)) return id;
-  const arr = id.split(path.sep);
-  const i = arr.findIndex((item) => item === "node_modules");
-  const name = arr[i + 1] === ".pnpm" ? arr[i + 2] : arr[i + 1];
-  return name;
-}
+
 
 function logCircleModules(circleModules: Module[]) {
   const str = circleModules.map((module) => module.id).join(" -> ");
@@ -258,24 +251,11 @@ export class Bundle {
   /** 加载模块 */
   loadModules = new Map<string, any>();
   noBundleModules = new Map<string, any>();
-  /** 外部模块 */
-  externalModules = new Map<string, any>();
-  /** 实际外部模块 */
-  originExternalModules = new Map<string, any>();
-  unUsedExternalModules = new Map<string, any>();
+  
   options: Config;
-  externals = [];
   constructor(options: Config) {
     this.options = options;
-    if (options.pkgPath) {
-      const pkg = readFileSync(options.pkgPath, "utf-8");
-      const pkgJson = JSON.parse(pkg);
-
-      this.externals = [
-        ...Object.keys(pkgJson.dependencies || []),
-        ...Object.keys(pkgJson.devDependencies || []),
-      ];
-    }
+   
     const jsonName = "moduleTree.json";
     const jsonPath = path.join(options.root, jsonName);
     if (!existsSync(jsonPath))
@@ -286,30 +266,20 @@ export class Bundle {
   resolveOriginModuleByBundle(
     fn: (
       originModules: Map<string, any>,
-      originExternalModules: Map<string, any>,
-      externals: string[],
+
     ) => void,
   ) {
-    fn(this.originModules, this.originExternalModules, this.externals);
+    fn(this.originModules);
   }
   /** 获取编译阶段模块 */
   resolveLoadModule(id: string) {
     if (!idInExternals(id)) {
       this.loadModules.set(id, id);
-    } else {
-      const externalArr = getExternalName(id).split("@");
-      const externalName =
-        externalArr.length === 3
-          ? externalArr[0] + "@" + externalArr[1]
-          : externalArr[0];
-      if (this.externals.includes(externalName))
-        this.externalModules.set(getExternalName(id), getExternalName(id));
     }
   }
   /** 寻找在编译模块和实际模块都存在的模块 */
   findLoadModuleWithOriginModule() {
     const result = {};
-    const externalResult = {};
 
     this.loadModules.forEach((module, id) => {
       if (this.originModules.has(id)) {
@@ -318,18 +288,10 @@ export class Bundle {
         this.noBundleModules.set(id, module);
       }
     });
-    this.externalModules.forEach((module, id) => {
-      if (this.originExternalModules.has(id)) {
-        externalResult[id] = this.originExternalModules.get(id);
-      } else {
-        this.unUsedExternalModules.set(id, module);
-      }
-    });
-    console.log(Object.keys(externalResult));
+   
 
     return {
       modules: result,
-      externalModules: externalResult,
     };
   }
   /** 根据map生产moduleGraph */

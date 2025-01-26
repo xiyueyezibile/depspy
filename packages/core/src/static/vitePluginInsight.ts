@@ -1,6 +1,6 @@
 import { writeFileSync } from "fs";
 import path from "path";
-import { Bundle, Config, getExternalName, idInExternals } from "./staticModule";
+import { Bundle, Config,  idInExternals } from "./staticModule";
 
 export function vitePluginInsight(options: Config): any {
   /** 全局保存 */
@@ -14,26 +14,16 @@ export function vitePluginInsight(options: Config): any {
     load(id) {
       globleBundle.resolveLoadModule(id);
     },
+   
     generateBundle(_, bundle) {
       // 根据bundle获取实际被打包的模块
       globleBundle.resolveOriginModuleByBundle(
-        (originModules, originExternalModules, externals) => {
+        (originModules) => {
           const distLists = Object.values(bundle);
           distLists.forEach((dist) => {
             Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
               if (!idInExternals(id)) {
                 originModules.set(id, data);
-              } else {
-                const externalArr = getExternalName(id).split("@");
-                const externalName =
-                  externalArr.length === 3
-                    ? externalArr[0] + "@" + externalArr[1]
-                    : externalArr[0];
-                if (externals.includes(externalName))
-                  originExternalModules.set(getExternalName(id), [
-                    ...(originExternalModules.get(getExternalName(id)) || []),
-                    data,
-                  ]);
               }
             });
           });
@@ -49,6 +39,7 @@ export function vitePluginInsight(options: Config): any {
       // 获取所所有导入导出关系
       Object.keys(map.modules).forEach((id) => {
         const info = this.getModuleInfo(id);
+        
         if (info && info.isIncluded) {
           moduleGraph.importers.set(info.id, info.importers);
           moduleGraph.importedIds.set(info.id, info.importedIds);
