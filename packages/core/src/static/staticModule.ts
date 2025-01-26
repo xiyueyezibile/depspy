@@ -16,8 +16,6 @@ export function idInExternals(id: string) {
   });
 }
 
-
-
 function logCircleModules(circleModules: Module[]) {
   const str = circleModules.map((module) => module.id).join(" -> ");
   console.log(`Circular dependency detected: ${str}`);
@@ -244,6 +242,23 @@ class ModuleGraph {
   }
 }
 
+export function postServerGraph(data: string, key: string) {
+  const len = key.length;
+  const dataLen = 10;
+  let zeroKey = key;
+  for (let i = 0; i < dataLen - len; i++) {
+    zeroKey = "0" + zeroKey;
+  }
+
+  return fetch(`http://localhost:2023/collectBundle`, {
+    method: "post",
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+    body: Buffer.from(zeroKey + data),
+  });
+}
+
 export class Bundle {
   moduleGraph: ModuleGraph;
   /** 实际打包模块 */
@@ -251,11 +266,11 @@ export class Bundle {
   /** 加载模块 */
   loadModules = new Map<string, any>();
   noBundleModules = new Map<string, any>();
-  
+
   options: Config;
   constructor(options: Config) {
     this.options = options;
-   
+
     const jsonName = "moduleTree.json";
     const jsonPath = path.join(options.root, jsonName);
     if (!existsSync(jsonPath))
@@ -263,12 +278,7 @@ export class Bundle {
   }
 
   /** 获取实际被打包的模块 */
-  resolveOriginModuleByBundle(
-    fn: (
-      originModules: Map<string, any>,
-
-    ) => void,
-  ) {
+  resolveOriginModuleByBundle(fn: (originModules: Map<string, any>) => void) {
     fn(this.originModules);
   }
   /** 获取编译阶段模块 */
@@ -288,7 +298,6 @@ export class Bundle {
         this.noBundleModules.set(id, module);
       }
     });
-   
 
     return {
       modules: result,
@@ -299,5 +308,3 @@ export class Bundle {
     this.moduleGraph = new ModuleGraph(this, map.modules);
   }
 }
-
-

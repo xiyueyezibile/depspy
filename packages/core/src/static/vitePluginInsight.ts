@@ -1,6 +1,6 @@
 import { writeFileSync } from "fs";
 import path from "path";
-import { Bundle, Config,  idInExternals } from "./staticModule";
+import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
 
 export function vitePluginInsight(options: Config): any {
   /** 全局保存 */
@@ -14,21 +14,19 @@ export function vitePluginInsight(options: Config): any {
     load(id) {
       globleBundle.resolveLoadModule(id);
     },
-   
-    generateBundle(_, bundle) {
+
+    async generateBundle(_, bundle) {
       // 根据bundle获取实际被打包的模块
-      globleBundle.resolveOriginModuleByBundle(
-        (originModules) => {
-          const distLists = Object.values(bundle);
-          distLists.forEach((dist) => {
-            Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
-              if (!idInExternals(id)) {
-                originModules.set(id, data);
-              }
-            });
+      globleBundle.resolveOriginModuleByBundle((originModules) => {
+        const distLists = Object.values(bundle);
+        distLists.forEach((dist) => {
+          Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
+            if (!idInExternals(id)) {
+              originModules.set(id, data);
+            }
           });
-        },
-      );
+        });
+      });
       const map = globleBundle.findLoadModuleWithOriginModule();
       globleBundle.newModuleByMap(map);
 
@@ -39,7 +37,7 @@ export function vitePluginInsight(options: Config): any {
       // 获取所所有导入导出关系
       Object.keys(map.modules).forEach((id) => {
         const info = this.getModuleInfo(id);
-        
+
         if (info && info.isIncluded) {
           moduleGraph.importers.set(info.id, info.importers);
           moduleGraph.importedIds.set(info.id, info.importedIds);
@@ -55,6 +53,25 @@ export function vitePluginInsight(options: Config): any {
       moduleGraph.analyseCircleModule(options.entry);
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(options.root, jsonName);
+      const data = moduleGraph.stringifyTreeByRootId(options.entry);
+      const len = 100000;
+      console.log(Math.ceil(data.length / len));
+
+      try {
+        await Promise.all(
+          new Array(Math.ceil(data.length / len)).fill(0).map((_, i) => {
+            return postServerGraph(
+              data.slice(i * len, (i + 1) * len),
+              `${i + 1}`,
+            );
+          }),
+        );
+        // 发送end消息
+        await postServerGraph("", "0");
+      } catch (error) {
+        console.log(error);
+      }
+
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId(options.entry));
       // bundle[jsonName] = {
       //   type: 'asset',

@@ -8,6 +8,9 @@ import {
   reduceKey,
 } from "@dep-spy/utils";
 
+const bufferArr = [];
+let tsTree = null;
+
 function successHandler(res: Response, data: unknown) {
   res.send({
     message: "success",
@@ -165,6 +168,27 @@ export function createHttp(app: Express, graph: Graph) {
       const buffer = jsonsToBuffer(nodeJsons);
 
       bufferHandler(res, buffer);
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  });
+
+  app.post<any>("/collectBundle", (req, res) => {
+    try {
+      console.log(req.body.slice(0, 10).toString());
+
+      if (req.body.slice(0, 10).toString() !== "0000000000") {
+        bufferArr.push({
+          key: req.body.slice(0, 10).toString(),
+          value: req.body.slice(10).toString(),
+        });
+      } else {
+        bufferArr.sort((a, b) => parseInt(a.key) - parseInt(b.key));
+        tsTree = JSON.parse(bufferArr.map((i) => i.value).join(""));
+      }
+      res.send({
+        message: "success",
+      });
     } catch (error) {
       errorHandler(res, error);
     }
