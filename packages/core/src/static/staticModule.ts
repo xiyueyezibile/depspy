@@ -32,6 +32,7 @@ interface ModuleTree {
   depth: number;
   path: string[];
   idpath: string[];
+  rootId?: string;
 }
 
 class Module {
@@ -190,7 +191,7 @@ class ModuleGraph {
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
       id: id,
-      pathId: entryId,
+      pathId: entryId.slice(this.rootId.length), // 去掉根目录
       depth: parent ? parent.depth + 1 : 0,
       name: nameArr
         .slice(nameArr.length >= 2 ? nameArr.length - 2 : 0)
@@ -198,9 +199,9 @@ class ModuleGraph {
       children: [],
       idpath: parent ? [...parent.idpath, id] : [id],
       // circleIds: [],
-      path: parent ? [...parent.path, entryId] : [entryId],
+      path: parent ? [...parent.path, entryId.slice(this.rootId.length)] : [entryId.slice(this.rootId.length)],
     };
-
+    if(!parent) tree.rootId = this.rootId;
     // depth = 0 停止向下遍历
     if (depth === 0) return tree;
     // 发现循环路径

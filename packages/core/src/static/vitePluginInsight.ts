@@ -39,6 +39,7 @@ export function vitePluginInsight(options: Config): any {
         const info = this.getModuleInfo(id);
 
         if (info && info.isIncluded) {
+          
           moduleGraph.importers.set(info.id, info.importers);
           moduleGraph.importedIds.set(info.id, info.importedIds);
           moduleGraph.dynamicImporters.set(info.id, info.dynamicImporters);
@@ -55,7 +56,6 @@ export function vitePluginInsight(options: Config): any {
       const jsonPath = path.join(options.root, jsonName);
       const data = moduleGraph.genarateTiledTreeByRootId(options.entry);
       const len = 80
-      console.log(Math.ceil(data.length));
 
       try {
         await Promise.all(
