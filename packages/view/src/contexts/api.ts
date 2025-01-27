@@ -116,3 +116,11 @@ export const getNodeByPath = async (query: {
     data: treeRoot as Node[],
   };
 };
+
+export const getStaticGraph = async () => {
+  const res = await fetch(`${baseUrl}/getStaticTree`, {
+    method: "GET"
+  });
+  console.log(res);
+  
+}

@@ -53,9 +53,9 @@ export function vitePluginInsight(options: Config): any {
       moduleGraph.analyseCircleModule(options.entry);
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(options.root, jsonName);
-      const data = moduleGraph.stringifyTreeByRootId(options.entry);
-      const len = 100000;
-      console.log(Math.ceil(data.length / len));
+      const data = moduleGraph.genarateTiledTreeByRootId(options.entry);
+      const len = 80
+      console.log(Math.ceil(data.length));
 
       try {
         await Promise.all(
@@ -67,7 +67,7 @@ export function vitePluginInsight(options: Config): any {
           }),
         );
         // 发送end消息
-        await postServerGraph("", "0");
+        // await postServerGraph("", "0");
       } catch (error) {
         console.log(error);
       }

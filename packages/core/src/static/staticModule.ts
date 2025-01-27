@@ -1,3 +1,4 @@
+import { jsonsToBuffer } from "@dep-spy/utils";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 
@@ -58,6 +59,7 @@ class ModuleGraph {
   bundle: Bundle;
   entryId: string;
   rootId: string;
+  tiledTree: ModuleTree[] = [];
   private _moduleIds = new Map<string, number>();
   constructor(bundle: Bundle, map: Record<string, any>) {
     this.bundle = bundle;
@@ -227,10 +229,17 @@ class ModuleGraph {
     }
     return tree;
   }
-  genarateTreeByRootId(entryId: string = this.entryId) {
+  tileTree(tree: ModuleTree) {
+    tree.children.forEach((child) => {
+      this.tileTree(child)
+    })
+    this.tiledTree.push({...tree, children: []})
+  }
+  genarateTiledTreeByRootId(entryId: string = this.entryId) {
     if (this.graph.has(entryId)) {
-      const rootModule = this.graph.get(entryId);
-      return rootModule;
+      const rootTree = this.transform(entryId);
+      this.tileTree(rootTree)
+      return this.tiledTree;
     }
     return null;
   }
@@ -242,7 +251,7 @@ class ModuleGraph {
   }
 }
 
-export function postServerGraph(data: string, key: string) {
+export function postServerGraph(data: ModuleTree[], key: string) {
   const len = key.length;
   const dataLen = 10;
   let zeroKey = key;
@@ -255,7 +264,7 @@ export function postServerGraph(data: string, key: string) {
     headers: {
       "Content-Type": "application/octet-stream",
     },
-    body: Buffer.from(zeroKey + data),
+    body: jsonsToBuffer(data.map(item => JSON.stringify(item))),
   });
 }
 

@@ -9,7 +9,6 @@ import {
 } from "@dep-spy/utils";
 
 const bufferArr = [];
-let tsTree = null;
 
 function successHandler(res: Response, data: unknown) {
   res.send({
@@ -172,23 +171,22 @@ export function createHttp(app: Express, graph: Graph) {
       errorHandler(res, error);
     }
   });
-
-  app.post<any>("/collectBundle", (req, res) => {
+  // 收集 bundle 图
+  app.post<Buffer>("/collectBundle", (req, res) => {
     try {
-      console.log(req.body.slice(0, 10).toString());
 
-      if (req.body.slice(0, 10).toString() !== "0000000000") {
-        bufferArr.push({
-          key: req.body.slice(0, 10).toString(),
-          value: req.body.slice(10).toString(),
-        });
-      } else {
-        bufferArr.sort((a, b) => parseInt(a.key) - parseInt(b.key));
-        tsTree = JSON.parse(bufferArr.map((i) => i.value).join(""));
-      }
+      bufferArr.push(req.body);
+      
       res.send({
         message: "success",
       });
+    } catch (error) {
+      errorHandler(res, error);
+    }
+  });
+  app.get<any>("/getStaticTree", (req, res) => {
+    try {
+      bufferHandler(res, Buffer.concat(bufferArr))
     } catch (error) {
       errorHandler(res, error);
     }
