@@ -174,9 +174,8 @@ export function createHttp(app: Express, graph: Graph) {
   // 收集 bundle 图
   app.post<Buffer>("/collectBundle", (req, res) => {
     try {
-
       bufferArr.push(req.body);
-      
+
       res.send({
         message: "success",
       });
@@ -186,7 +185,7 @@ export function createHttp(app: Express, graph: Graph) {
   });
   app.get<any>("/getStaticTree", (req, res) => {
     try {
-      bufferHandler(res, Buffer.concat(bufferArr))
+      bufferHandler(res, Buffer.concat(bufferArr));
     } catch (error) {
       errorHandler(res, error);
     }

@@ -199,9 +199,11 @@ class ModuleGraph {
       children: [],
       idpath: parent ? [...parent.idpath, id] : [id],
       // circleIds: [],
-      path: parent ? [...parent.path, entryId.slice(this.rootId.length)] : [entryId.slice(this.rootId.length)],
+      path: parent
+        ? [...parent.path, entryId.slice(this.rootId.length)]
+        : [entryId.slice(this.rootId.length)],
     };
-    if(!parent) tree.rootId = this.rootId;
+    if (!parent) tree.rootId = this.rootId;
     // depth = 0 停止向下遍历
     if (depth === 0) return tree;
     // 发现循环路径
@@ -232,14 +234,14 @@ class ModuleGraph {
   }
   tileTree(tree: ModuleTree) {
     tree.children.forEach((child) => {
-      this.tileTree(child)
-    })
-    this.tiledTree.push({...tree, children: []})
+      this.tileTree(child);
+    });
+    this.tiledTree.push({ ...tree, children: [] });
   }
   genarateTiledTreeByRootId(entryId: string = this.entryId) {
     if (this.graph.has(entryId)) {
       const rootTree = this.transform(entryId);
-      this.tileTree(rootTree)
+      this.tileTree(rootTree);
       return this.tiledTree;
     }
     return null;
@@ -252,20 +254,13 @@ class ModuleGraph {
   }
 }
 
-export function postServerGraph(data: ModuleTree[], key: string) {
-  const len = key.length;
-  const dataLen = 10;
-  let zeroKey = key;
-  for (let i = 0; i < dataLen - len; i++) {
-    zeroKey = "0" + zeroKey;
-  }
-
+export function postServerGraph(data: ModuleTree[]) {
   return fetch(`http://localhost:2023/collectBundle`, {
     method: "post",
     headers: {
       "Content-Type": "application/octet-stream",
     },
-    body: jsonsToBuffer(data.map(item => JSON.stringify(item))),
+    body: jsonsToBuffer(data.map((item) => JSON.stringify(item))),
   });
 }
 

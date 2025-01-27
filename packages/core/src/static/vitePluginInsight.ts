@@ -7,6 +7,7 @@ export function vitePluginInsight(options: Config): any {
   let globleBundle: Bundle;
   return {
     name: "vite-plugin-insight",
+    enforce: "pre",
     configResolved() {
       // 初始化
       globleBundle = new Bundle(options);
@@ -39,7 +40,6 @@ export function vitePluginInsight(options: Config): any {
         const info = this.getModuleInfo(id);
 
         if (info && info.isIncluded) {
-          
           moduleGraph.importers.set(info.id, info.importers);
           moduleGraph.importedIds.set(info.id, info.importedIds);
           moduleGraph.dynamicImporters.set(info.id, info.dynamicImporters);
@@ -55,15 +55,12 @@ export function vitePluginInsight(options: Config): any {
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(options.root, jsonName);
       const data = moduleGraph.genarateTiledTreeByRootId(options.entry);
-      const len = 80
+      const len = 80;
 
       try {
         await Promise.all(
           new Array(Math.ceil(data.length / len)).fill(0).map((_, i) => {
-            return postServerGraph(
-              data.slice(i * len, (i + 1) * len),
-              `${i + 1}`,
-            );
+            return postServerGraph(data.slice(i * len, (i + 1) * len));
           }),
         );
         // 发送end消息
