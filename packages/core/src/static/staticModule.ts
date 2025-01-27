@@ -33,6 +33,8 @@ interface ModuleTree {
   path: string[];
   idpath: string[];
   rootId?: string;
+  removedExports: string[];
+  renderedExports: string[];
 }
 
 class Module {
@@ -43,6 +45,8 @@ class Module {
   /** key导入value */
   importedIds: Module[] = [];
   dynamicallyImportedIds: Module[] = [];
+  removedExports: string[] = [];
+  renderedExports: string[] = [];
   circleModules = new Map<string, Module[]>();
   constructor(id: string) {
     this.id = id;
@@ -126,6 +130,12 @@ class ModuleGraph {
           })
           .filter(Boolean);
       }
+      if (this.bundle.originModules.has(id)) {
+        module.removedExports =
+          this.bundle.originModules.get(id).removedExports;
+        module.renderedExports =
+          this.bundle.originModules.get(id).renderedExports;
+      }
     });
   }
   /** 分析并标记循环依赖 */
@@ -202,18 +212,21 @@ class ModuleGraph {
       path: parent
         ? [...parent.path, entryId.slice(this.rootId.length)]
         : [entryId.slice(this.rootId.length)],
+      removedExports: [],
+      renderedExports: [],
     };
     if (!parent) tree.rootId = this.rootId;
-    // depth = 0 停止向下遍历
-    if (depth === 0) return tree;
-    // 发现循环路径
-    if (new Set(tree.path).size !== tree.path.length) {
-      return tree;
-    }
 
     if (this.graph.has(entryId)) {
       const rootModule = this.graph.get(entryId);
-
+      tree.removedExports = rootModule.removedExports;
+      tree.renderedExports = rootModule.renderedExports;
+      // depth = 0 停止向下遍历
+      if (depth === 0) return tree;
+      // 发现循环路径
+      if (new Set(tree.path).size !== tree.path.length) {
+        return tree;
+      }
       // 遍历导入模块
       tree.children = rootModule.importedIds
         .map((module) => {
@@ -267,7 +280,13 @@ export function postServerGraph(data: ModuleTree[]) {
 export class Bundle {
   moduleGraph: ModuleGraph;
   /** 实际打包模块 */
-  originModules = new Map<string, any>();
+  originModules = new Map<
+    string,
+    {
+      removedExports: string[];
+      renderedExports: string[];
+    }
+  >();
   /** 加载模块 */
   loadModules = new Map<string, any>();
   noBundleModules = new Map<string, any>();
