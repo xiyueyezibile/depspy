@@ -4,6 +4,9 @@ import { useStaticStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 export default function StaticTree() {
   const { staticRoot } = useStaticStore();
+  console.log(staticRoot);
+
+  const rootPath = staticRoot.rootId;
   function G6RegisterNode() {
     // 注册module节点
     G6.registerNode(
@@ -88,20 +91,20 @@ export default function StaticTree() {
       },
     });
     // 注册循环线节点
-    G6.registerEdge('circle-line', {
+    G6.registerEdge("circle-line", {
       draw(cfg, group) {
         const { startPoint, endPoint } = cfg;
-        
-        const shape = group.addShape('line', {
+
+        const shape = group.addShape("line", {
           attrs: {
             x1: startPoint.x,
             y1: startPoint.y,
             x2: endPoint.x,
             y2: endPoint.y,
-            stroke: 'red', // 黑色直线
+            stroke: "red", // 黑色直线
             lineWidth: 2, // 线宽
           },
-          name: 'circle-line-path',
+          name: "circle-line-path",
         });
         return shape;
       },
@@ -155,7 +158,7 @@ export default function StaticTree() {
         type: "compactBox",
         direction: "LR",
         getId: function getId(d) {
-          return d.id;
+          return rootPath + d.pathId + "-" + d.id;
         },
         getVGap: function getVGap() {
           return 0;
@@ -168,29 +171,30 @@ export default function StaticTree() {
     const circleMap = new Map();
     //转换为g6的数据格式
     G6.Util.traverseTree(staticRoot, (subTree) => {
-      if(new Set(subTree.path).size !== subTree.path.length) {
-        for(const v of subTree.idpath) {
-          const arr = v.split('-')
-          if(arr.slice(0, arr.length - 1).join('-') === subTree.pathId) {
-            circleMap.set(v, subTree.id)
+      if (new Set(subTree.path).size !== subTree.path.length) {
+        for (let i = 0; i < subTree.idpath.length; i++) {
+          if (subTree.path[i] === subTree.pathId) {
+            const id = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
+
+            circleMap.set(id, rootPath + subTree.pathId + "-" + subTree.id);
           }
         }
       }
+      subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
+
       return true;
     });
     graph.data(staticRoot);
-    
+
     graph.render();
     circleMap.forEach((v, k) => {
-      graph.addItem('edge', {
+      graph.addItem("edge", {
         source: k,
         target: v,
-        type: 'circle-line',
-      })
-    })
+        type: "circle-line",
+      });
+    });
     graph.fitView();
-
-    
   }, [staticRoot]);
 
   useEffect(() => {
@@ -201,7 +205,7 @@ export default function StaticTree() {
           return;
         graph.changeSize(container.scrollWidth, container.scrollHeight);
       };
-  }, [])
+  }, []);
 
   return <div id="container" className="w-100vw h-100vh"></div>;
 }

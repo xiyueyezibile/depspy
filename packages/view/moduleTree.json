@@ -32050,6 +32050,8 @@
                 "children",
                 "idpath",
                 "path",
+                "removedExports",
+                "renderedExports",
                 "rootId",
                 "default"
               ]
