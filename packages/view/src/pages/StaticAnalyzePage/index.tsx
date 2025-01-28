@@ -5,6 +5,7 @@ import StaticTree from "@/components/StaticTree";
 import { useStaticStore } from "@/contexts";
 import moduleTree from "../../../moduleTree.json";
 import { useEffect } from "react";
+import { Sidebar } from "./Sidebar";
 
 export default function StaticAnalyzePage() {
   const { staticRootLoading, staticRoot, setStaticRoot } = useStaticStore();
@@ -27,6 +28,7 @@ export default function StaticAnalyzePage() {
       <div className="fixed -z-50 bg-bg-container">
         <GridBackground></GridBackground>
       </div>
+      <Sidebar />
       <div className="fixed flex p-5">
         <LanguageIcon />
         <ThemeIcon />
