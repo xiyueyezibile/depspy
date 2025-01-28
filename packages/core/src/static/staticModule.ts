@@ -197,7 +197,7 @@ class ModuleGraph {
       this._moduleIds.set(entryId, 1);
       id = `1`;
     }
-    const nameArr = entryId.split(path.sep);
+    const nameArr = entryId.split("/");
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
       id: id,
@@ -205,7 +205,7 @@ class ModuleGraph {
       depth: parent ? parent.depth + 1 : 0,
       name: nameArr
         .slice(nameArr.length >= 2 ? nameArr.length - 2 : 0)
-        .join(path.sep),
+        .join("/"),
       children: [],
       idpath: parent ? [...parent.idpath, id] : [id],
       // circleIds: [],
@@ -252,6 +252,8 @@ class ModuleGraph {
     this.tiledTree.push({ ...tree, children: [] });
   }
   genarateTiledTreeByRootId(entryId: string = this.entryId) {
+    console.log(entryId);
+
     if (this.graph.has(entryId)) {
       const rootTree = this.transform(entryId);
       this.tileTree(rootTree);

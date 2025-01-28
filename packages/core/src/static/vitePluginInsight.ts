@@ -5,6 +5,11 @@ import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
 export function vitePluginInsight(options: Config): any {
   /** 全局保存 */
   let globleBundle: Bundle;
+  // replace
+  options.entry =
+    path.sep === "\\" ? options.entry.replace(/\\/g, "/") : options.entry;
+  options.root =
+    path.sep === "\\" ? options.root.replace(/\\/g, "/") : options.root;
   return {
     name: "vite-plugin-insight",
     enforce: "pre",
@@ -29,6 +34,7 @@ export function vitePluginInsight(options: Config): any {
         });
       });
       const map = globleBundle.findLoadModuleWithOriginModule();
+
       globleBundle.newModuleByMap(map);
 
       // 拿到moduleGraph

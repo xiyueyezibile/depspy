@@ -32055,6 +32055,30 @@
                 "rootId",
                 "default"
               ]
+            },
+            {
+              "parentId": "/src/pages/StaticAnalyzePage/index.tsx-2",
+              "id": "2",
+              "pathId": "/src/pages/StaticAnalyzePage/Sidebar/index.tsx",
+              "depth": 3,
+              "name": "Sidebar/index.tsx",
+              "children": [],
+              "idpath": [
+                "2",
+                "2",
+                "2",
+                "2"
+              ],
+              "path": [
+                "/src/main.tsx",
+                "/src/App.tsx",
+                "/src/pages/StaticAnalyzePage/index.tsx",
+                "/src/pages/StaticAnalyzePage/Sidebar/index.tsx"
+              ],
+              "removedExports": [],
+              "renderedExports": [
+                "Sidebar"
+              ]
             }
           ],
           "idpath": [
