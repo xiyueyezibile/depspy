@@ -8,10 +8,10 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./vitePluginInsight": {
-      "import": "./dist/static/vitePluginInsight.mjs",
+    "./vite-plugin-insight": {
+      "import": "./dist/static/vitePluginInsight.js",
       "require": "./dist/static/vitePluginInsight.js",
-      "types": "./dist/static/vitePluginInsight.d.mts"
+      "types": "./dist/static/vitePluginInsight.d.ts"
     }
   },
   "private": false,
@@ -26,10 +26,16 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "tsup": "^7.1.0"
+    "rollup": "^4.32.1",
+    "tsup": "^7.1.0",
+    "vite": "^4.4.9"
+  },
+  "peerDependencies": {
+    "vite": "^4.4.9"
   },
   "dependencies": {
-    "@dep-spy/utils": "workspace:^"
+    "@dep-spy/utils": "workspace:^",
+    "acorn-walk": "^8.3.4"
   },
   "gitHead": "50c073c23fc0eed9ed09baaa47244288326bc3d8"
 }

@@ -6,6 +6,8 @@ export default defineConfig({
     "src/threadsPool/worker.ts",
     "src/static/vitePluginInsight.ts",
   ],
+  publicDir: "public",
+  external: ["vite", "rollup"],
   splitting: false,
   sourcemap: true,
   format: ["esm", "cjs"],

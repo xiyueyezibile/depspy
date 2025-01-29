@@ -1,10 +1,17 @@
 import { writeFileSync } from "fs";
 import path from "path";
+import { SourceToImportId } from "./utils";
 import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
+import type { PluginOption, UserConfig } from "vite";
+import getAllExportEffected from "./getAllExportEffected";
 
-export function vitePluginInsight(options: Config): any {
+export function vitePluginInsight(options: Config): PluginOption {
   /** 全局保存 */
-  let globleBundle: Bundle;
+  let globalBundle: Bundle;
+  // 用户配置
+  let userConfig: UserConfig = {} as UserConfig;
+  // 源码路径和绝对路径的互相映射
+  const sourceToImportIdMap = new SourceToImportId();
   // replace
   options.entry =
     path.sep === "\\" ? options.entry.replace(/\\/g, "/") : options.entry;
@@ -15,15 +22,42 @@ export function vitePluginInsight(options: Config): any {
     enforce: "pre",
     configResolved() {
       // 初始化
-      globleBundle = new Bundle(options);
+      globalBundle = new Bundle(options);
+    },
+    config(_userConfig) {
+      userConfig = _userConfig;
+    },
+    resolveId(id, importer, options) {
+      // 调用下一个 resolveId 钩子获取输出
+      return this.resolve(id, importer, { ...options, skipSelf: true }).then(
+        (output) => {
+          if (output?.id) {
+            sourceToImportIdMap.addRecord(id, importer, output?.id);
+          }
+          return output;
+        },
+      );
     },
     load(id) {
-      globleBundle.resolveLoadModule(id);
+      globalBundle.resolveLoadModule(id);
     },
-
+    async buildEnd() {
+      // 获取所有模块的导出改动信息
+      const allExportEffected = await getAllExportEffected.call(
+        this,
+        options.entry,
+        new Set([options.entry]),
+        sourceToImportIdMap,
+        userConfig,
+      );
+      allExportEffected.forEach((value, key) => {
+        console.log(key, value, "\n");
+      });
+    },
     async generateBundle(_, bundle) {
+      return;
       // 根据bundle获取实际被打包的模块
-      globleBundle.resolveOriginModuleByBundle((originModules) => {
+      globalBundle.resolveOriginModuleByBundle((originModules) => {
         const distLists = Object.values(bundle);
         distLists.forEach((dist) => {
           Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
@@ -33,12 +67,12 @@ export function vitePluginInsight(options: Config): any {
           });
         });
       });
-      const map = globleBundle.findLoadModuleWithOriginModule();
+      const map = globalBundle.findLoadModuleWithOriginModule();
 
-      globleBundle.newModuleByMap(map);
+      globalBundle.newModuleByMap(map);
 
       // 拿到moduleGraph
-      const moduleGraph = globleBundle.moduleGraph;
+      const moduleGraph = globalBundle.moduleGraph;
       moduleGraph.rootId = options.root;
       moduleGraph.entryId = options.entry;
       // 获取所所有导入导出关系
