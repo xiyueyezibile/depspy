@@ -1,9 +1,14 @@
-import { useRef } from "react"
-
+import useLanguage from "@/i18n/hooks/useLanguage";
+import { useRef, useState } from "react"
+import './index.scss'
+import { Global } from "./Global";
+import { Selected } from "./Selected";
 
 
 export const Sidebar = () => {
     const containerRef = useRef(null)
+    const [choose, setChoose] = useState<'global' | 'selected'>('global')
+    const { t } = useLanguage();
     const draggleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         e.preventDefault()
         // 记录鼠标初始位置和元素初始宽度
@@ -13,8 +18,7 @@ export const Sidebar = () => {
             // 计算鼠标移动的距离
             const dx = startX  -  ev.clientX
             
-            // 设置元素的新宽度
-            if(startWidth + dx < 20 || startWidth + dx > 300) containerRef.current.style.width = `${startWidth + dx}px`
+             containerRef.current.style.width = `${startWidth + dx}px`
         }
         const mouseUp = (ev) => {
             // 销毁监听函数
@@ -25,8 +29,16 @@ export const Sidebar = () => {
         window.addEventListener('mouseup' , mouseUp)
     }
 
-    return <div className="fixed h-[100%] flex right-0">
-        <div onMouseDown={draggleMouseDown} className="w-[5px] h-[100%] cursor-col-resize absolute translate-x-[-50%]"></div>
-        <div ref={containerRef} className="w-full h-[100%] text-[var(--color-text)]">11</div>
+    return <div className="fixed h-[100%] flex right-0 bg-bg-container">
+        <div onMouseDown={draggleMouseDown} className="w-[2px] h-[100%] cursor-col-resize absolute translate-x-[-50%] bg-border"></div>
+        <div ref={containerRef} className="w-full h-[100%] text-text">{
+            choose === 'global'? <Global /> : <Selected />
+            }</div>
+        <div onClick={() => setChoose('global')} className={
+            choose === 'global'? "sidebar-choose-item-active left-[calc(-3rem-3px)] top-[25vh]": "sidebar-choose-item left-[calc(-3rem-3px)] top-[25vh]"
+        }>{t('static.sidebar.choose.global')}</div>
+        <div onClick={() => setChoose('selected')} className={
+            choose === 'selected'? "sidebar-choose-item-active left-[calc(-3rem-3px)] bottom-[25vh]": "sidebar-choose-item left-[calc(-3rem-3px)] bottom-[25vh]"
+        }>{t('static.sidebar.choose.select')}</div>
     </div>
 }

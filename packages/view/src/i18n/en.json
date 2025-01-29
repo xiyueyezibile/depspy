@@ -60,5 +60,13 @@
   },
   "skeleton": {
     "tip": "Loading, please be patient 😇"
+  },
+  "static": {
+    "sidebar": {
+      "choose": {
+        "global": "GLOBAL",
+        "select": "SELECT"
+      }
+    }
   }
 }

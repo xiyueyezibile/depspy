@@ -60,5 +60,13 @@
   },
   "skeleton": {
     "tip": "加载中，请耐心等待 😇"
+  },
+  "static": {
+    "sidebar": {
+      "choose": {
+        "global": "全局",
+        "select": "选中"
+      }
+    }
   }
 }
