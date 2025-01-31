@@ -37,10 +37,10 @@ export default defineConfig(({ mode }) => {
         "fs",
         "path",
       ]),
-      // vitePluginInsight({
-      //   entry: path.join(process.cwd(), "src/main.tsx"),
-      //   root: process.cwd(), // 项目根目录
-      // }),
+      vitePluginInsight({
+        entry: path.join(process.cwd(), "src/main.tsx"),
+        root: process.cwd(), // 项目根目录
+      }),
     ],
     resolve: {
       alias: {

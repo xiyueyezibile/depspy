@@ -7,7 +7,6 @@ import getAllExportEffected from "./getAllExportEffected";
 import { DEP_SPY_START } from "../constant";
 
 export function vitePluginInsight(options: Config): PluginOption {
-  console.log(process.env[DEP_SPY_START]);
   if (!process.env[DEP_SPY_START]) {
     return false;
   }

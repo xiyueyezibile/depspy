@@ -85,6 +85,7 @@ cli
     // 设置环境变量，保证插件只能通过ds命令运行
     process.env[DEP_SPY_START] = "true";
     exec(options.script, { cwd: process.cwd() }, (err, std) => {
+      console.log(std);
       spinner.stop();
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
     });

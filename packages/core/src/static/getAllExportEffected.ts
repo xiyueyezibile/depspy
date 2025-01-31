@@ -19,7 +19,14 @@ const extToTransformMap = new Map([
   ],
 ]);
 // 绝对路径=>导出受到影响的导出
-const importIdToExportEffected: Map<string, Set<string>> = new Map();
+export interface ExportEffectedNode {
+  exportEffectedNames: Set<string>;
+  // 是否有代码变更
+  isGitChange?: boolean;
+  // 是否有导入变更
+  isImportChange?: boolean;
+}
+const importIdToExportEffected: Map<string, ExportEffectedNode> = new Map();
 // 记录已经进入的处理队列的Promise
 const importIdToExportEffectedPromise: Map<
   string,
@@ -50,7 +57,7 @@ export default async function getAllExportEffect(
   const ext = path.extname(absolutePath);
   // 如果是node_modules下的文件或者不是JS类型的源码，直接返回
   if (entry.includes("node_modules") || !targetExt.has(ext)) {
-    const exportEffect = new Set<string>();
+    const exportEffect: ExportEffectedNode = { exportEffectedNames: new Set() };
     importIdToExportEffected.set(entry, exportEffect);
     paths.delete(entry);
     return importIdToExportEffected;
@@ -83,7 +90,7 @@ export default async function getAllExportEffect(
 
   const preCode = getFileContentAtCommit(absolutePath, "HEAD");
   const curCode = readFileSync(absolutePath, "utf-8");
-  const exportChanges: Set<string> = new Set();
+  const exportChanges: ExportEffectedNode = { exportEffectedNames: new Set() };
   const exportEffectPromise: Promise<void>[] = [];
   // 遍历当前文件的导出，判断各个导出是否有变动
   currentInfo?.exports?.forEach((exportName: string) => {
@@ -107,15 +114,15 @@ export default async function getAllExportEffect(
       const curHash = getHashFromString(cur.treeShakingCode);
       const preHash = getHashFromString(pre.treeShakingCode);
       if (curHash !== preHash) {
-        exportChanges.add(exportName);
-        return;
+        exportChanges.isGitChange = true;
+        exportChanges.exportEffectedNames.add(exportName);
       }
       // 该导出依赖的引入是否变动,
       cur.sourceToImports.forEach((imports, source) => {
         // 引入文件的哪些导出受到了影响
         const sourceExportEffect = importIdToExportEffected.get(
           sourceToImportIdMap.getImportIdBySource(source, entry) || "",
-        );
+        )?.exportEffectedNames;
         if (sourceExportEffect) {
           // 依次确认哪些引入有改动
           imports.forEach((_import) => {
@@ -125,7 +132,8 @@ export default async function getAllExportEffect(
               sourceExportEffect.has(_import) ||
               (_import === "*" && sourceExportEffect.size)
             ) {
-              exportChanges.add(exportName);
+              exportChanges.isImportChange = true;
+              exportChanges.exportEffectedNames.add(exportName);
             }
           });
         }

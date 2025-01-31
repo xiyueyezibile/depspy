@@ -1,7 +1,8 @@
 import { jsonsToBuffer } from "@dep-spy/utils";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import http from 'http'
+import http from "http";
+import { ExportEffectedNode } from "./getAllExportEffected";
 
 export interface Config {
   root: string;
@@ -34,6 +35,8 @@ interface ModuleTree {
   path: string[];
   idpath: string[];
   rootId?: string;
+  isGitChange: boolean;
+  isImportChange: boolean;
   removedExports: string[];
   renderedExports: string[];
   changedExports: string[];
@@ -201,6 +204,8 @@ class ModuleGraph {
       id = `1`;
     }
     const nameArr = entryId.split("/");
+    const exportEffect = this.bundle.allExportEffected.get(entryId);
+
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
       id: id,
@@ -217,10 +222,13 @@ class ModuleGraph {
         : [entryId.slice(this.rootId.length)],
       removedExports: [],
       renderedExports: [],
-      changedExports: this.bundle.allExportEffected.has(entryId)? Array.from(this.bundle.allExportEffected.get(entryId)) : []
+      isGitChange: Boolean(exportEffect?.isGitChange),
+      isImportChange: Boolean(exportEffect?.isImportChange),
+      changedExports: exportEffect
+        ? Array.from(exportEffect.exportEffectedNames)
+        : [],
     };
-    
-    
+
     if (!parent) tree.rootId = this.rootId;
 
     if (this.graph.has(entryId)) {
@@ -277,33 +285,32 @@ class ModuleGraph {
 
 export function postServerGraph(data: ModuleTree[]) {
   const options = {
-    hostname: 'localhost',
+    hostname: "localhost",
     port: 2023,
-    path: '/collectBundle',
-    method: 'POST',
+    path: "/collectBundle",
+    method: "POST",
     headers: {
-      'Content-Type': 'application/octet-stream',
-    }
+      "Content-Type": "application/octet-stream",
+    },
   };
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
       let chunks = [];
-      res.on('data', (chunk) => {
+      res.on("data", (chunk) => {
         chunks.push(chunk);
       });
-      res.on('end', () => {
+      res.on("end", () => {
         resolve(Buffer.concat(chunks).toString());
       });
     });
 
-    req.on('error', (error) => {
+    req.on("error", (error) => {
       reject(error);
     });
 
-    req.write(jsonsToBuffer(data.map(item => JSON.stringify(item))));
+    req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
     req.end();
   });
-
 }
 
 export class Bundle {
@@ -321,7 +328,7 @@ export class Bundle {
   noBundleModules = new Map<string, any>();
 
   options: Config;
-  allExportEffected: Map<string, Set<string>>;
+  allExportEffected: Map<string, ExportEffectedNode>;
 
   constructor(options: Config) {
     this.options = options;
