@@ -4,7 +4,7 @@ import { blue, green, yellow } from "chalk";
 import { generateGraph, DEP_SPY_START } from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
-import { exec, execSync } from "child_process";
+import { exec } from "child_process";
 const cli = cac();
 // 包依赖
 cli
@@ -83,9 +83,8 @@ cli
     const startTime = Date.now();
     const spinner = ora(blue("🕵️ 正在潜入\n")).start();
     // 设置环境变量，保证插件只能通过ds命令运行
-    execSync(`npm run mark`);
+    process.env[DEP_SPY_START] = "true";
     exec(options.script, { cwd: process.cwd() }, (err, std) => {
-      console.log(std);
       spinner.stop();
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
     });
