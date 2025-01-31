@@ -1,6 +1,7 @@
 import { jsonsToBuffer } from "@dep-spy/utils";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
+import http from 'http'
 
 export interface Config {
   root: string;
@@ -275,13 +276,34 @@ class ModuleGraph {
 }
 
 export function postServerGraph(data: ModuleTree[]) {
-  return fetch(`http://localhost:2023/collectBundle`, {
-    method: "post",
+  const options = {
+    hostname: 'localhost',
+    port: 2023,
+    path: '/collectBundle',
+    method: 'POST',
     headers: {
-      "Content-Type": "application/octet-stream",
-    },
-    body: jsonsToBuffer(data.map((item) => JSON.stringify(item))),
+      'Content-Type': 'application/octet-stream',
+    }
+  };
+  return new Promise((resolve, reject) => {
+    const req = http.request(options, (res) => {
+      let chunks = [];
+      res.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+      res.on('end', () => {
+        resolve(Buffer.concat(chunks).toString());
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(error);
+    });
+
+    req.write(jsonsToBuffer(data.map(item => JSON.stringify(item))));
+    req.end();
   });
+
 }
 
 export class Bundle {
