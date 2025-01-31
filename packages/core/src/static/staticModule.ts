@@ -35,6 +35,7 @@ interface ModuleTree {
   rootId?: string;
   removedExports: string[];
   renderedExports: string[];
+  changedExports: string[];
 }
 
 class Module {
@@ -61,6 +62,7 @@ class ModuleGraph {
   /** key导入value */
   importedIds = new Map<string, readonly string[]>();
   dynamicallyImportedIds = new Map<string, readonly string[]>();
+
   bundle: Bundle;
   entryId: string;
   rootId: string;
@@ -214,7 +216,10 @@ class ModuleGraph {
         : [entryId.slice(this.rootId.length)],
       removedExports: [],
       renderedExports: [],
+      changedExports: this.bundle.allExportEffected.has(entryId)? Array.from(this.bundle.allExportEffected.get(entryId)) : []
     };
+    
+    
     if (!parent) tree.rootId = this.rootId;
 
     if (this.graph.has(entryId)) {
@@ -294,6 +299,8 @@ export class Bundle {
   noBundleModules = new Map<string, any>();
 
   options: Config;
+  allExportEffected: Map<string, Set<string>>;
+
   constructor(options: Config) {
     this.options = options;
 
