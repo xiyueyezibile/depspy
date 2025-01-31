@@ -1,19 +1,18 @@
 import cac from "cac";
 import ora from "ora";
 import { blue, green, yellow } from "chalk";
-import { generateGraph } from "@dep-spy/core";
+import { generateGraph, DEP_SPY_START } from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
+import { exec, execSync } from "child_process";
 const cli = cac();
+// 包依赖
 cli
-  .command("[analysis,ana]", "解析本地项目依赖关系图")
+  .command("[analysis,ana]", "解析项目三方包依赖")
   .option("--graph <graph>", "输出依赖图的文件路径", {
     type: ["string"],
   })
   .option("--co,--codependency <codependency>", "输出相同依赖的文件路径", {
-    type: ["string"],
-  })
-  .option("--entry <entry>", "项目的入口路径", {
     type: ["string"],
   })
   .option(
@@ -62,13 +61,34 @@ cli
     if (options.isOutput) {
       await graph.outputToFile();
     }
-
     spinner.stop();
-
     console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
 
     // 启动可视化界面
     createServer(graph, options);
+  });
+
+// 源码依赖
+cli
+  .command("static [script]", "解析项目源码依赖")
+  .option("--script <script>", "项目的构建命令", {
+    type: ["string"],
+  })
+  .action(async (script, options) => {
+    options = await conformConfig(options);
+    // 无命名参数优先
+    if (script) {
+      options.script = script;
+    }
+    const startTime = Date.now();
+    const spinner = ora(blue("🕵️ 正在潜入\n")).start();
+    // 设置环境变量，保证插件只能通过ds命令运行
+    execSync(`npm run mark`);
+    exec(options.script, { cwd: process.cwd() }, (err, std) => {
+      console.log(std);
+      spinner.stop();
+      console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
+    });
   });
 
 cli.help();

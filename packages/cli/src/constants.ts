@@ -3,7 +3,8 @@ export { Config } from "@dep-spy/core";
 export const defaultConfig = {
   depth: 3,
   size: false,
-  entry: null,
+  entry: "",
+  script: "",
   output: {
     graph: "ds.graph.json",
     staticGraph: "ds.static.json",

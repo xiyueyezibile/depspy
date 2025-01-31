@@ -4,8 +4,13 @@ import { SourceToImportId } from "./utils";
 import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
 import type { PluginOption, UserConfig } from "vite";
 import getAllExportEffected from "./getAllExportEffected";
+import { DEP_SPY_START } from "../constant";
 
 export function vitePluginInsight(options: Config): PluginOption {
+  console.log(process.env[DEP_SPY_START]);
+  if (!process.env[DEP_SPY_START]) {
+    return false;
+  }
   /** 全局保存 */
   let globalBundle: Bundle;
   // 用户配置
@@ -20,6 +25,7 @@ export function vitePluginInsight(options: Config): PluginOption {
   return {
     name: "vite-plugin-insight",
     enforce: "pre",
+
     configResolved() {
       // 初始化
       globalBundle = new Bundle(options);

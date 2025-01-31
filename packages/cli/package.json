@@ -14,7 +14,8 @@
   },
   "scripts": {
     "dev": "tsup --watch",
-    "build": "tsup --minify"
+    "build": "tsup --minify",
+    "mark": "cross-env DEP_SPY_START=true"
   },
   "dependencies": {
     "@dep-spy/core": "workspace:^",

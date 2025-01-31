@@ -208,11 +208,13 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
       },
       plugins: [
         ...(userConfig?.plugins || []).filter(
+          // 避免主插件循环执行
           (plugin) => plugin?.["name"] !== "vite-plugin-insight",
         ),
         {
           name: "find-export-dependency",
           enforce: "pre",
+          // 虚拟模块路径引入逻辑
           resolveId(id, importer) {
             if (id in virtualModules) {
               return id;
@@ -222,6 +224,7 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
             }
             return null;
           },
+          // 虚拟模块加载逻辑
           load(id) {
             if (id in virtualModules) {
               return virtualModules[id];
@@ -233,6 +236,7 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
               // 处理源码，不处理静态资源
               if (module.type === "chunk") {
                 treeShakingCode = module?.code || "";
+                // 有些文件类型需要特殊处理
                 if (extToTransformMap.has(ext)) {
                   treeShakingCode = extToTransformMap.get(ext)!(module?.code);
                 }
