@@ -41,7 +41,7 @@ export function vitePluginInsight(options: Config): PluginOption {
     load(id) {
       globalBundle.resolveLoadModule(id);
     },
-    async buildEnd() {
+    async generateBundle(_, bundle) {
       // 获取所有模块的导出改动信息
       const allExportEffected = await getAllExportEffected.call(
         this,
@@ -50,14 +50,7 @@ export function vitePluginInsight(options: Config): PluginOption {
         sourceToImportIdMap,
         userConfig,
       );
-      allExportEffected.forEach((value, key) => {
-        console.log(key, value, "\n");
-      });
       globalBundle.allExportEffected = allExportEffected;
-      
-    },
-    async generateBundle(_, bundle) {
-      
       // 根据bundle获取实际被打包的模块
       globalBundle.resolveOriginModuleByBundle((originModules) => {
         const distLists = Object.values(bundle);
@@ -112,7 +105,6 @@ export function vitePluginInsight(options: Config): PluginOption {
       }
 
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId(options.entry));
-      
     },
   };
 }
