@@ -60,6 +60,8 @@ export interface Store {
 export interface StaticStore {
   staticRoot: StaticNode;
   staticRootLoading: boolean;
+  highlightedNodeIds: Set<string>;
+  setHighlightedNodeIds: (nodeIds: Set<string>) => void;
   setStaticRoot: (staticRoot: StaticNode) => void;
   setStaticRootLoading: (staticRootLoading: boolean) => void;
 }

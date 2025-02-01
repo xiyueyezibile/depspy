@@ -93,6 +93,9 @@ export const useStaticStore = createWithEqualityFn<StaticStore>()(
   subscribeWithSelector((set) => ({
     staticRootLoading: true,
     staticRoot: null,
+    highlightedNodeIds: new Set(),
+    setHighlightedNodeIds: (highlightedNodeIds: Set<string>) =>
+      set({ highlightedNodeIds }),
     setStaticRoot: (staticRoot: StaticNode) => set({ staticRoot }),
     setStaticRootLoading: (staticRootLoading: boolean) =>
       set({ staticRootLoading }),
