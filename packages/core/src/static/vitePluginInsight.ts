@@ -2,12 +2,15 @@ import { writeFileSync } from "fs";
 import path from "path";
 import { SourceToImportId } from "./utils";
 import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
-import type { PluginOption, UserConfig } from "vite";
+import { resolveConfig, type PluginOption, type UserConfig } from "vite";
 import getAllExportEffected from "./getAllExportEffected";
 import { DEP_SPY_START } from "../constant";
 
 export function vitePluginInsight(options: Config): PluginOption {
-  if (!process.env[DEP_SPY_START]) {
+  // if (!process.env[DEP_SPY_START]) {
+  //   return false;
+  // }
+  if (process.env["ds-test"]) {
     return false;
   }
   /** 全局保存 */
@@ -21,6 +24,7 @@ export function vitePluginInsight(options: Config): PluginOption {
     path.sep === "\\" ? options.entry.replace(/\\/g, "/") : options.entry;
   options.root =
     path.sep === "\\" ? options.root.replace(/\\/g, "/") : options.root;
+
   return {
     name: "vite-plugin-insight",
     enforce: "pre",
@@ -55,6 +59,9 @@ export function vitePluginInsight(options: Config): PluginOption {
         sourceToImportIdMap,
         userConfig,
       );
+      allExportEffected.forEach((key, value) => {
+        console.log(key, value, "\n");
+      });
       globalBundle.allExportEffected = allExportEffected;
       // 根据bundle获取实际被打包的模块
       globalBundle.resolveOriginModuleByBundle((originModules) => {
@@ -78,7 +85,6 @@ export function vitePluginInsight(options: Config): PluginOption {
       // 获取所所有导入导出关系
       Object.keys(map.modules).forEach((id) => {
         const info = this.getModuleInfo(id);
-
         if (info && info.isIncluded) {
           moduleGraph.importers.set(info.id, info.importers);
           moduleGraph.importedIds.set(info.id, info.importedIds);
@@ -110,6 +116,7 @@ export function vitePluginInsight(options: Config): PluginOption {
       }
 
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId(options.entry));
+      console.log("moduleTree.json文件已生成");
     },
   };
 }

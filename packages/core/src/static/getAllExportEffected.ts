@@ -1,11 +1,13 @@
 import { build, UserConfig } from "vite";
-import { simple } from "acorn-walk";
-import { execSync } from "child_process";
 import path from "path";
-import crypto from "crypto";
-import { SourceToImportId } from "./utils";
+import {
+  findSourceToImportsFormAst,
+  getFileContentAtCommit,
+  getHashFromString,
+  readFileSyncSafe,
+  SourceToImportId,
+} from "./utils";
 import { PluginContext } from "rollup";
-import { readFileSync } from "fs";
 
 // 只处理包含JS逻辑的文件类型
 const targetExt = new Set<string>([".ts", ".js", ".jsx", ".tsx", ".vue"]);
@@ -53,8 +55,7 @@ export default async function getAllExportEffect(
     paths.delete(entry);
     return importIdToExportEffected;
   }
-  const absolutePath = entry;
-  const ext = path.extname(absolutePath);
+  const ext = path.extname(entry);
   // 如果是node_modules下的文件或者不是JS类型的源码，直接返回
   if (entry.includes("node_modules") || !targetExt.has(ext)) {
     const exportEffect: ExportEffectedNode = { exportEffectedNames: new Set() };
@@ -62,7 +63,7 @@ export default async function getAllExportEffect(
     paths.delete(entry);
     return importIdToExportEffected;
   }
-  const currentInfo = this.getModuleInfo(absolutePath);
+  const currentInfo = this.getModuleInfo(entry);
   // 保证该文件的import的影响已经计算完成
   const importDepPromise: Promise<Map<string, Set<string>>>[] = [];
   currentInfo?.importedIds?.forEach((importedId) => {
@@ -88,10 +89,11 @@ export default async function getAllExportEffect(
   // 确保改文件的所有依赖都已经解析完成
   await Promise.all(importDepPromise);
 
-  const preCode = getFileContentAtCommit(absolutePath, "HEAD");
-  const curCode = readFileSync(absolutePath, "utf-8");
+  const preCode = getFileContentAtCommit(entry, "HEAD");
+  const curCode = readFileSyncSafe(entry);
   const exportChanges: ExportEffectedNode = { exportEffectedNames: new Set() };
   const exportEffectPromise: Promise<void>[] = [];
+
   // 遍历当前文件的导出，判断各个导出是否有变动
   currentInfo?.exports?.forEach((exportName: string) => {
     const curTreeShakingCodePromise = getTreeShakingDetail({
@@ -149,25 +151,6 @@ export default async function getAllExportEffect(
   return importIdToExportEffected;
 }
 
-// 获取指定版本的提交内容
-function getFileContentAtCommit(absolutePath: string, commitHash: string) {
-  try {
-    const gitRootPath = execSync("git rev-parse --show-toplevel")
-      .toString()
-      .trim();
-    // 构建 Git 命令
-    const command = `git show ${commitHash}:${path.relative(
-      gitRootPath,
-      absolutePath,
-    )}`;
-    // 同步执行 Git 命令
-    const output = execSync(command);
-    // 将输出转换为字符串并返回
-    return output.toString();
-  } catch (error) {
-    return "";
-  }
-}
 // 构造导入语句
 function constructImportStatement(importedId: string, importName: string) {
   // 处理默认导入
@@ -190,7 +173,7 @@ interface GetTreeShakingDetailOptions {
 }
 // 通过vite的treeshaking规范获取指定导出真正依赖的源码和真正依赖的引入
 async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
-  const { code, exportName, ext, userConfig } = options;
+  const { code, exportName, ext } = options;
   const virtualSourceModuleId = `virtual:source${ext ? `${ext}` : ""}`;
   const virtualImporterModuleId = "virtual:importer";
   const virtualModules = {
@@ -204,9 +187,6 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
   let sourceToImports: Map<string, Set<string>> = new Map();
   try {
     await build({
-      ...userConfig,
-      root: path.resolve(__dirname, "../"),
-      // root: "/Users/ziplili/Desktop/vitejs-vite-gjy4dcfj/pulgin",
       build: {
         minify: false,
         write: false,
@@ -215,15 +195,16 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
         },
       },
       plugins: [
-        ...(userConfig?.plugins || []).filter(
-          // 避免主插件循环执行
-          (plugin) => plugin?.["name"] !== "vite-plugin-insight",
-        ),
         {
           name: "find-export-dependency",
           enforce: "pre",
-          // 虚拟模块路径引入逻辑
+          buildStart() {
+            process.env["ds-test"] = "true";
+          },
           resolveId(id, importer) {
+            if (importer?.endsWith(".html")) {
+              return virtualImporterModuleId;
+            }
             if (id in virtualModules) {
               return id;
             }
@@ -232,6 +213,9 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
             }
             return null;
           },
+          config(config) {
+            delete config.build.rollupOptions.output;
+          },
           // 虚拟模块加载逻辑
           load(id) {
             if (id in virtualModules) {
@@ -239,6 +223,7 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
             }
             return null;
           },
+
           generateBundle(_, chunk) {
             Object.values(chunk).forEach((module) => {
               // 处理源码，不处理静态资源
@@ -262,6 +247,7 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
           1. 代码中有语法错误
           2. 代码中有导入不存在的模块
         */
+    console.log(e);
     return {
       treeShakingCode,
       sourceToImports,
@@ -272,49 +258,4 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
     treeShakingCode,
     sourceToImports,
   };
-}
-// 获取AST中的导入对应关系，比如import {a,b as c} from 'xxx'，则返回{xxx:[a,b]}
-function findSourceToImportsFormAst(
-  ast?: Parameters<typeof simple>["0"] | null,
-) {
-  const sourceToImports: Map<string, Set<string>> = new Map();
-  // 如果没有AST，直接返回
-  if (!ast) {
-    return sourceToImports;
-  }
-  simple(ast, {
-    ImportDeclaration(node) {
-      const source = String(node.source.value);
-      const specifiers = node.specifiers;
-      // 确保source对应的Set存在
-      function ensureSet(value: string) {
-        if (sourceToImports.get(source)) {
-          sourceToImports.get(source)?.add(value);
-        } else {
-          sourceToImports.set(source, new Set([value]));
-        }
-      }
-      specifiers.forEach((specifier) => {
-        if (specifier.type === "ImportDefaultSpecifier") {
-          // 处理默认导入
-          ensureSet("default");
-        } else if (specifier.type === "ImportNamespaceSpecifier") {
-          // 处理命名空间导入
-          ensureSet("*");
-        } else if (specifier.type === "ImportSpecifier") {
-          // 处理具名导入
-          if (specifier.imported.type === "Identifier") {
-            ensureSet(specifier.imported.name);
-          } else {
-            ensureSet(String(specifier.imported.value));
-          }
-        }
-      });
-    },
-  });
-  return sourceToImports;
-}
-// 通过字符串获取hash值
-function getHashFromString(input: string) {
-  return crypto.createHash("md5").update(input).digest("hex");
 }

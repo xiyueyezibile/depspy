@@ -3,7 +3,6 @@
   "version": "2.2.1",
   "description": "",
   "main": "./dist/tsup/index.js",
-  "type": "module",
   "private": false,
   "publishConfig": {
     "access": "public"
