@@ -18,3 +18,5 @@ export const NPM_DOMAINS = [
 export const HOST_MAX_FETCH_NUMBER = 6;
 // 是否由DepSpy启动，vite插件需要据此判断是否启动
 export const DEP_SPY_START = "DEP_SPY_START";
+// 是否由vite子插件运行时标记，避免主插件循环使用
+export const DEP_SPY_SUB_START = "DEP_SPY_SUB_START";

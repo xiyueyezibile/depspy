@@ -4,10 +4,12 @@ import {
   findSourceToImportsFormAst,
   getFileContentAtCommit,
   getHashFromString,
+  isGitFileModified,
   readFileSyncSafe,
   SourceToImportId,
 } from "./utils";
 import { PluginContext } from "rollup";
+import { DEP_SPY_SUB_START } from "../constant";
 
 // 只处理包含JS逻辑的文件类型
 const targetExt = new Set<string>([".ts", ".js", ".jsx", ".tsx", ".vue"]);
@@ -22,7 +24,10 @@ const extToTransformMap = new Map([
 ]);
 // 绝对路径=>导出受到影响的导出
 export interface ExportEffectedNode {
+  // 受影响的导出
   exportEffectedNames: Set<string>;
+  // 受影响的导入,例如：{ "./a": ["a","b","default"] }
+  importEffectedNames: Map<string, Set<string>>;
   // 是否有代码变更
   isGitChange?: boolean;
   // 是否有导入变更
@@ -58,7 +63,10 @@ export default async function getAllExportEffect(
   const ext = path.extname(entry);
   // 如果是node_modules下的文件或者不是JS类型的源码，直接返回
   if (entry.includes("node_modules") || !targetExt.has(ext)) {
-    const exportEffect: ExportEffectedNode = { exportEffectedNames: new Set() };
+    const exportEffect: ExportEffectedNode = {
+      exportEffectedNames: new Set(),
+      importEffectedNames: new Map(),
+    };
     importIdToExportEffected.set(entry, exportEffect);
     paths.delete(entry);
     return importIdToExportEffected;
@@ -91,7 +99,10 @@ export default async function getAllExportEffect(
 
   const preCode = getFileContentAtCommit(entry, "HEAD");
   const curCode = readFileSyncSafe(entry);
-  const exportChanges: ExportEffectedNode = { exportEffectedNames: new Set() };
+  const exportChanges: ExportEffectedNode = {
+    exportEffectedNames: new Set(),
+    importEffectedNames: new Map(),
+  };
   const exportEffectPromise: Promise<void>[] = [];
 
   // 遍历当前文件的导出，判断各个导出是否有变动
@@ -112,19 +123,22 @@ export default async function getAllExportEffect(
       curTreeShakingCodePromise,
       preTreeShakingCodePromise,
     ]).then(([cur, pre]) => {
-      // 和上个版本比较，本身的代码是否变动
-      const curHash = getHashFromString(cur.treeShakingCode);
-      const preHash = getHashFromString(pre.treeShakingCode);
-      if (curHash !== preHash) {
-        exportChanges.isGitChange = true;
-        exportChanges.exportEffectedNames.add(exportName);
+      // 如果git发生的变化，和上个版本比较，本身的代码是否变动
+      if (isGitFileModified(entry)) {
+        const curHash = getHashFromString(cur.treeShakingCode);
+        const preHash = getHashFromString(pre.treeShakingCode);
+        if (curHash !== preHash) {
+          exportChanges.isGitChange = true;
+          exportChanges.exportEffectedNames.add(exportName);
+        }
       }
       // 该导出依赖的引入是否变动,
       cur.sourceToImports.forEach((imports, source) => {
         // 引入文件的哪些导出受到了影响
-        const sourceExportEffect = importIdToExportEffected.get(
-          sourceToImportIdMap.getImportIdBySource(source, entry) || "",
-        )?.exportEffectedNames;
+        const importId =
+          sourceToImportIdMap.getImportIdBySource(source, entry) || "";
+        const sourceExportEffect =
+          importIdToExportEffected.get(importId)?.exportEffectedNames;
         if (sourceExportEffect) {
           // 依次确认哪些引入有改动
           imports.forEach((_import) => {
@@ -134,7 +148,19 @@ export default async function getAllExportEffect(
               sourceExportEffect.has(_import) ||
               (_import === "*" && sourceExportEffect.size)
             ) {
+              // 构建exportChanges节点
               exportChanges.isImportChange = true;
+              const importEffectedName =
+                exportChanges.importEffectedNames.get(source);
+              if (importEffectedName) {
+                importEffectedName.add(_import);
+              } else {
+                // 首次进入进入逻辑
+                exportChanges.importEffectedNames.set(
+                  importId,
+                  new Set([_import]),
+                );
+              }
               exportChanges.exportEffectedNames.add(exportName);
             }
           });
@@ -194,27 +220,40 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
           polyfill: false,
         },
       },
+      optimizeDeps: {
+        force: true,
+      },
       plugins: [
         {
           name: "find-export-dependency",
           enforce: "pre",
           buildStart() {
-            process.env["ds-test"] = "true";
+            process.env[DEP_SPY_SUB_START] = "true";
           },
           resolveId(id, importer) {
+            // 入口引入直接替换为虚拟模块
             if (importer?.endsWith(".html")) {
               return virtualImporterModuleId;
             }
+            // 虚拟模块之间的引入
             if (id in virtualModules) {
               return id;
             }
+            // 其他标记为引入external，无需处理
             if (importer === virtualSourceModuleId) {
               return { id, external: true, moduleSideEffects: false };
             }
             return null;
           },
           config(config) {
-            delete config.build.rollupOptions.output;
+            // 兼容有分包的逻辑
+            if (Array.isArray(config.build.rollupOptions.output)) {
+              config.build.rollupOptions.output.map((item) => {
+                delete item.manualChunks;
+              });
+            } else {
+              delete config.build.rollupOptions.output.manualChunks;
+            }
           },
           // 虚拟模块加载逻辑
           load(id) {

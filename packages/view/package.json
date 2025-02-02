@@ -12,8 +12,8 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/tsup/index.js",
-      "require": "./dist/tsup/index.cjs"
+      "import": "./dist/tsup/index.mjs",
+      "require": "./dist/tsup/index.js"
     }
   },
   "scripts": {

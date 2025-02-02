@@ -136,3 +136,18 @@ export function readFileSyncSafe(id: string) {
   }
   return code;
 }
+
+// 通过git判断文件是否修改
+export function isGitFileModified(filePath: string) {
+  try {
+    const output = execSync(
+      `git diff --quiet ${filePath} || echo "true"`,
+    ).toString();
+    if (output) {
+      return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+}

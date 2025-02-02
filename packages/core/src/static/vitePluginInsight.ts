@@ -2,15 +2,15 @@ import { writeFileSync } from "fs";
 import path from "path";
 import { SourceToImportId } from "./utils";
 import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
-import { resolveConfig, type PluginOption, type UserConfig } from "vite";
+import { type PluginOption, type UserConfig } from "vite";
 import getAllExportEffected from "./getAllExportEffected";
-import { DEP_SPY_START } from "../constant";
+import { DEP_SPY_SUB_START } from "../constant";
 
 export function vitePluginInsight(options: Config): PluginOption {
   // if (!process.env[DEP_SPY_START]) {
   //   return false;
   // }
-  if (process.env["ds-test"]) {
+  if (process.env[DEP_SPY_SUB_START]) {
     return false;
   }
   /** 全局保存 */
@@ -51,7 +51,10 @@ export function vitePluginInsight(options: Config): PluginOption {
       globalBundle.resolveLoadModule(id);
     },
     async generateBundle(_, bundle) {
-      // 获取所有模块的导出改动信息
+      // 避免子模块运行打包导致多次运行
+      if (process.env[DEP_SPY_SUB_START]) {
+        return;
+      }
       const allExportEffected = await getAllExportEffected.call(
         this,
         options.entry,
