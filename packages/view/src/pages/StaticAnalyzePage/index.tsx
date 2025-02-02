@@ -6,6 +6,7 @@ import { useStaticStore } from "@/contexts";
 import moduleTree from "../../../moduleTree.json";
 import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
+import Tool from "./Tool";
 
 export default function StaticAnalyzePage() {
   const { staticRootLoading, staticRoot, setStaticRoot } = useStaticStore();
@@ -24,6 +25,9 @@ export default function StaticAnalyzePage() {
     <main className="w-screen h-screen overflow-hidden">
       <div className="fixed">
         <StaticTree />
+      </div>
+      <div className="fixed left-0 bottom-0">
+        <Tool />
       </div>
       <div className="fixed -z-50 bg-bg-container">
         <GridBackground></GridBackground>

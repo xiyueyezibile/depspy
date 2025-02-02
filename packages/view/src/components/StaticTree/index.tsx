@@ -22,7 +22,7 @@ export default function StaticTree() {
   const containerRef = useRef<HTMLDivElement>();
   const rootPath = staticRoot.rootId;
 
-  console.log(staticRoot);
+  // console.log(staticRoot);
 
   useEffect(() => {
     //清除所有item的高亮状态
@@ -41,7 +41,8 @@ export default function StaticTree() {
     //为当前item添加高亮状态
     highlightedNodeIds.forEach((id) => {
       const item = graphRef.current.findById(id) as G6.Node;
-      const relatedEdges = item.getEdges();
+      if (!item) return;
+      const relatedEdges = item?.getEdges() || [];
       graphRef.current.setItemState(item, "highlight", true);
       graphRef.current.refreshItem(item);
       relatedEdges.forEach((edge) => {
