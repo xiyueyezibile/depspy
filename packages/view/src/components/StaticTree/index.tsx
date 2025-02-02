@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import G6 from "@antv/g6";
+import * as G6 from "@antv/g6";
 import { useStaticStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 
@@ -15,12 +15,14 @@ export default function StaticTree() {
     highlightedNodeIds: state.highlightedNodeIds,
     setHighlightedNodeIds: state.setHighlightedNodeIds,
   }));
-  const graphRef = useRef();
+  const graphRef = useRef<G6.TreeGraph>();
   const [cloneData, setCloneData] = useState();
   const [circleMap, setCircleMap] = useState(new Map());
   const highlightedNodeIdsRef = useRef(highlightedNodeIds);
-  const containerRef = useRef();
+  const containerRef = useRef<HTMLDivElement>();
   const rootPath = staticRoot.rootId;
+
+  console.log(staticRoot);
 
   useEffect(() => {
     //清除所有item的高亮状态
@@ -38,7 +40,7 @@ export default function StaticTree() {
     });
     //为当前item添加高亮状态
     highlightedNodeIds.forEach((id) => {
-      const item = graphRef.current.findById(id);
+      const item = graphRef.current.findById(id) as G6.Node;
       const relatedEdges = item.getEdges();
       graphRef.current.setItemState(item, "highlight", true);
       graphRef.current.refreshItem(item);
@@ -74,7 +76,7 @@ export default function StaticTree() {
   }, [staticRoot]);
 
   useEffect(() => {
-    if (!cloneData) return;
+    if (!cloneData || !containerRef.current) return;
     // hover
     const tooltip = new G6.Tooltip({
       offsetX: 10,
@@ -83,7 +85,7 @@ export default function StaticTree() {
         const model = e.item._cfg.model;
         const outDiv = document.createElement("div");
         outDiv.style.width = "fit-content";
-        outDiv.innerHTML = model.name;
+        outDiv.innerHTML = model.name as string;
         return outDiv;
       },
       itemTypes: ["node"],
@@ -207,7 +209,7 @@ export default function StaticTree() {
       clearHighlight();
       const item = e.item;
       // const edges = item.getEdges();
-      const set = new Set();
+      const set = new Set<string>();
       // item.setState("highlight", true);
       // graph.refreshItem(item);
       item._cfg.id && set.add(item._cfg.id);
@@ -231,8 +233,8 @@ export default function StaticTree() {
     if (!window) return;
     window.onresize = throttle(() => {
       console.log("hahah");
-      containerRef.current.style.width = window.scrollWidth;
-      containerRef.current.style.height = window.scrollHeight;
+      containerRef.current.style.width = `${document.documentElement.clientWidth}px`;
+      containerRef.current.style.height = `${document.documentElement.clientHeight}px`;
       if (graphRef.current) {
         graphRef.current.changeSize(window.innerWidth, window.innerHeight);
         graphRef.current.fitView();
@@ -305,7 +307,8 @@ function G6RegisterNode() {
         });
         const tbox = text.getBBox();
         const rbox = rect.getBBox();
-        const hasChildren = cfg.children && cfg.children.length > 0;
+        const hasChildren =
+          Array.isArray(cfg.children) && cfg.children.length > 0;
         text.attr({
           x: (rbox.width - tbox.width) / 2,
           y: (rbox.height + tbox.height) / 2,
