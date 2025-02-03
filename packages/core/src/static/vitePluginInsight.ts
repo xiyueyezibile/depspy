@@ -3,7 +3,9 @@ import path from "path";
 import { SourceToImportId } from "./utils";
 import { Bundle, Config, idInExternals, postServerGraph } from "./staticModule";
 import { type PluginOption, type UserConfig } from "vite";
-import getAllExportEffected from "./getAllExportEffected";
+import getAllExportEffected, {
+  ExportEffectedNode,
+} from "./getAllExportEffected";
 import { DEP_SPY_SUB_START } from "../constant";
 
 export function vitePluginInsight(options: Config): PluginOption {
@@ -19,11 +21,9 @@ export function vitePluginInsight(options: Config): PluginOption {
   let userConfig: UserConfig = {} as UserConfig;
   // 源码路径和绝对路径的互相映射
   const sourceToImportIdMap = new SourceToImportId();
-  // replace
-  options.entry =
-    path.sep === "\\" ? options.entry.replace(/\\/g, "/") : options.entry;
-  options.root =
-    path.sep === "\\" ? options.root.replace(/\\/g, "/") : options.root;
+  // 规范化路径
+  options.entry = path.normalize(options.entry);
+  options.root = path.normalize(options.root);
 
   return {
     name: "vite-plugin-insight",
@@ -55,38 +55,49 @@ export function vitePluginInsight(options: Config): PluginOption {
       if (process.env[DEP_SPY_SUB_START]) {
         return;
       }
-      const allExportEffected = await getAllExportEffected.call(
-        this,
-        options.entry,
-        new Set([options.entry]),
-        sourceToImportIdMap,
-        userConfig,
-      );
+      const allExportEffected: Map<string, ExportEffectedNode> =
+        await getAllExportEffected.call(
+          this,
+          options.entry,
+          new Set([options.entry]),
+          sourceToImportIdMap,
+          userConfig,
+        );
       allExportEffected.forEach((key, value) => {
         console.log(key, value, "\n");
       });
       globalBundle.allExportEffected = allExportEffected;
       // 根据bundle获取实际被打包的模块
       globalBundle.resolveOriginModuleByBundle((originModules) => {
+        // 产物列表（包含静态资源和代码模块）
         const distLists = Object.values(bundle);
         distLists.forEach((dist) => {
-          Object.entries(dist["modules"] || {}).forEach(([id, data]) => {
-            if (!idInExternals(id)) {
-              originModules.set(id, data);
-            }
-          });
+          // 只处理代码块
+          if (dist.type === "chunk") {
+            // 改分块代码由哪些引入模块构成
+            Object.entries(dist.modules || {}).forEach(([id, data]) => {
+              // 需引入代码直接依赖的三方包，但排出三方包的后续依赖
+              if (allExportEffected.has(id) || !idInExternals(id)) {
+                originModules.set(id, {
+                  removedExports: data.removedExports,
+                  renderedExports: data.renderedExports,
+                });
+              }
+            });
+          }
         });
       });
-      const map = globalBundle.findLoadModuleWithOriginModule();
+      // 寻找在load阶段和打包阶段都存在的模块（去除了treeShaking的模块）
+      const actualMap = globalBundle.findLoadModuleWithOriginModule();
 
-      globalBundle.newModuleByMap(map);
-
-      // 拿到moduleGraph
+      // 挂载生成依赖树的类（只是壳子）
+      globalBundle.newModuleByMap(actualMap);
+      // 拿到moduleGraph （设置生成依赖树需要的数据）
       const moduleGraph = globalBundle.moduleGraph;
       moduleGraph.rootId = options.root;
       moduleGraph.entryId = options.entry;
-      // 获取所所有导入导出关系
-      Object.keys(map.modules).forEach((id) => {
+      // 获取所所有导入导出关系 （设置生成依赖树需要的数据）
+      Object.keys(actualMap.modules).forEach((id) => {
         const info = this.getModuleInfo(id);
         if (info && info.isIncluded) {
           moduleGraph.importers.set(info.id, info.importers);
@@ -98,22 +109,24 @@ export function vitePluginInsight(options: Config): PluginOption {
           );
         }
       });
-      /** 根据导入导出关系构建模块依赖图 */
+
+      /** 根据导入导出关系构建模块依赖图（根据上述设置的信息进行构建） */
       moduleGraph.buildGraph();
-      moduleGraph.analyseCircleModule(options.entry);
+      /** 分析并标记循环依赖 */
+      moduleGraph.analysisCircleModule(options.entry);
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(options.root, jsonName);
-      const data = moduleGraph.genarateTiledTreeByRootId(options.entry);
+      /** 生成铺平的树 */
+      const flatTree = moduleGraph.generateTiledTreeByRootId(options.entry);
       const len = 80;
 
+      // 分块发送数据给服务器
       try {
         await Promise.all(
-          new Array(Math.ceil(data.length / len)).fill(0).map((_, i) => {
-            return postServerGraph(data.slice(i * len, (i + 1) * len));
+          new Array(Math.ceil(flatTree.length / len)).fill(0).map((_, i) => {
+            return postServerGraph(flatTree.slice(i * len, (i + 1) * len));
           }),
         );
-        // 发送end消息
-        // await postServerGraph("", "0");
       } catch (error) {
         console.log(error);
       }

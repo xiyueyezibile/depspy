@@ -1,9 +1,13 @@
 import cac from "cac";
 import ora from "ora";
-import { blue, green, yellow } from "chalk";
+import { blue, green, yellow, red } from "chalk";
 import { generateGraph, DEP_SPY_START } from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
+import {
+  createServer as createStaticServer,
+  outPutUrl,
+} from "./static/createServer";
 import { exec } from "child_process";
 const cli = cac();
 // 包依赖
@@ -80,14 +84,25 @@ cli
     if (script) {
       options.script = script;
     }
+    // 关键参数检测
+    if (!options.script) {
+      throw new Error(
+        red("缺少项目的构建命令,请通过命令行参数或者配置文件添加"),
+      );
+    }
     const startTime = Date.now();
     const spinner = ora(blue("🕵️ 正在潜入\n")).start();
+
     // 设置环境变量，保证插件只能通过ds命令运行
     process.env[DEP_SPY_START] = "true";
-    exec(options.script, { cwd: process.cwd() }, (err, std) => {
+    // 启动服务器，准备接收插件数据
+    createStaticServer();
+    exec(options.script, { cwd: process.cwd() }, (_, std) => {
       console.log(std);
       spinner.stop();
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
+      // vite插件运行完毕，数据已经发送完毕，可以展示web页面
+      outPutUrl();
     });
   });
 

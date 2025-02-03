@@ -27,6 +27,7 @@ function logCircleModules(circleModules: Module[]) {
 interface ModuleTree {
   children?: ModuleTree[];
   parentId?: string;
+  // 当前
   id: string;
   pathId: string;
   name: string;
@@ -145,7 +146,7 @@ class ModuleGraph {
     });
   }
   /** 分析并标记循环依赖 */
-  analyseCircleModule(
+  analysisCircleModule(
     entryId: string = this.entryId,
     matchModules: Module[] | null = null,
   ) {
@@ -181,14 +182,13 @@ class ModuleGraph {
       const allImportedIds = [...importedIds, ...dynamicallyImportedIds];
       // 多叉树深度优先遍历
       allImportedIds.forEach((module) => {
-        this.analyseCircleModule(
+        this.analysisCircleModule(
           entryId,
           matchModules ? [...matchModules, module] : [rootModule, module],
         );
       });
     }
   }
-
   transform(
     entryId: string = this.entryId,
     depth: number = 9999,
@@ -265,9 +265,7 @@ class ModuleGraph {
     });
     this.tiledTree.push({ ...tree, children: [] });
   }
-  genarateTiledTreeByRootId(entryId: string = this.entryId) {
-    console.log(entryId);
-
+  generateTiledTreeByRootId(entryId: string = this.entryId) {
     if (this.graph.has(entryId)) {
       const rootTree = this.transform(entryId);
       this.tileTree(rootTree);
@@ -286,7 +284,7 @@ class ModuleGraph {
 export function postServerGraph(data: ModuleTree[]) {
   const options = {
     hostname: "localhost",
-    port: 2023,
+    port: 2025,
     path: "/collectBundle",
     method: "POST",
     headers: {
@@ -307,7 +305,6 @@ export function postServerGraph(data: ModuleTree[]) {
     req.on("error", (error) => {
       reject(error);
     });
-
     req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
     req.end();
   });

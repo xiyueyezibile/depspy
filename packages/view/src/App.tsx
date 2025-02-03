@@ -3,17 +3,17 @@ import {
   RouterProvider,
   createBrowserRouter,
 } from "react-router-dom";
-// import AnalyzePage from "./pages/AnalyzePage";
-// import SearchPage from "./pages/SearchPage";
+import AnalyzePage from "./pages/AnalyzePage";
+import SearchPage from "./pages/SearchPage";
 import { useStore } from "@/contexts";
 import useLanguage from "./i18n/hooks/useLanguage";
 import { useEffect } from "react";
 import StaticAnalyzePage from "./pages/StaticAnalyzePage";
 
 const routeElement = [
-  // { path: "search", element: <SearchPage /> },
-  // { path: "analyze", element: <AnalyzePage /> },
-  { path: "/static-analyze", element: <StaticAnalyzePage /> },
+  { path: "search", element: <SearchPage /> },
+  { path: "analyze", element: <AnalyzePage /> },
+  { path: "static-analyze", element: <StaticAnalyzePage /> },
   {
     path: "*",
     element: (
@@ -21,7 +21,7 @@ const routeElement = [
         to={
           import.meta.env.VITE_BUILD_MODE == "online"
             ? "/search"
-            : "/static-analyze?depth=3"
+            : "/analyze?depth=3"
         }
       />
     ),
