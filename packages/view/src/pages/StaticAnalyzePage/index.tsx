@@ -7,9 +7,17 @@ import moduleTree from "../../../moduleTree.json";
 import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import Tool from "./Tool";
+import { traverseTree } from "./utils";
 
 export default function StaticAnalyzePage() {
-  const { staticRootLoading, staticRoot, setStaticRoot } = useStaticStore();
+  const {
+    staticRootLoading,
+    staticRoot,
+    setStaticRoot,
+    setGitChangedNodes,
+    setImportChangedNodes,
+  } = useStaticStore();
+
   async function init() {
     const tree = moduleTree;
 
@@ -18,6 +26,27 @@ export default function StaticAnalyzePage() {
   useEffect(() => {
     init();
   }, []);
+
+  useEffect(() => {
+    if (!staticRoot) return;
+    if (staticRoot) {
+      //初始化git变更文件 导入变更文件
+      const gitChangeSet = new Set<string>();
+      const importChangeSet = new Set<string>();
+      const rootPath = staticRoot.rootId;
+      traverseTree(staticRoot, (node) => {
+        if (node.isGitChange) {
+          gitChangeSet.add(rootPath + node.pathId + "-" + node.id);
+        }
+        if (node.isImportChange) {
+          importChangeSet.add(rootPath + node.pathId + "-" + node.id);
+        }
+      });
+      setGitChangedNodes(gitChangeSet);
+      setImportChangedNodes(importChangeSet);
+    }
+  }, [staticRoot]);
+
   if (staticRootLoading && !staticRoot) {
     return <Skeleton></Skeleton>;
   }

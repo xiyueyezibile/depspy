@@ -13,7 +13,7 @@ import StaticAnalyzePage from "./pages/StaticAnalyzePage";
 const routeElement = [
   { path: "search", element: <SearchPage /> },
   { path: "analyze", element: <AnalyzePage /> },
-  { path: "static-analyze", element: <StaticAnalyzePage /> },
+  { path: "/static-analyze", element: <StaticAnalyzePage /> },
   {
     path: "*",
     element: (

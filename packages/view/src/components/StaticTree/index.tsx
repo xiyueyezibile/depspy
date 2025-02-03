@@ -69,7 +69,7 @@ export default function StaticTree() {
       }
       subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
       //初始化折叠状态
-      subTree.collapsed = subTree.depth > 0 ? true : false;
+      // subTree.collapsed = subTree.depth > 0 ? true : false;
       return true;
     });
     setCloneData(newData);
@@ -178,7 +178,7 @@ export default function StaticTree() {
     });
     graph.fitView();
 
-    //注册事件 --> 折叠与展开
+    //注册事件 --> 折叠与展开 高亮节点
     graph.on("node:click", (e) => {
       if (e.target.cfg.name === "collapse-icon") {
         clearHighlight();
@@ -200,30 +200,30 @@ export default function StaticTree() {
         });
         graph.refresh();
         graph.fitView();
+      } else {
+        e.stopPropagation();
+        clearHighlight();
+        const item = e.item;
+        // const edges = item.getEdges();
+        const set = new Set<string>();
+        // item.setState("highlight", true);
+        // graph.refreshItem(item);
+        item._cfg.id && set.add(item._cfg.id);
+        // edges.forEach((edge) => {
+        //   set.add(edge._cfg.id);
+        // });
+        setHighlightedNodeIds(set);
       }
-    });
-
-    // 高亮节点
-    graph.on("node:dblclick", (e) => {
-      if (e.target.cfg.name === "collapse-icon") return;
-      e.stopPropagation();
-      clearHighlight();
-      const item = e.item;
-      // const edges = item.getEdges();
-      const set = new Set<string>();
-      // item.setState("highlight", true);
-      // graph.refreshItem(item);
-      item._cfg.id && set.add(item._cfg.id);
-      // edges.forEach((edge) => {
-      //   set.add(edge._cfg.id);
-      // });
-      setHighlightedNodeIds(set);
     });
 
     //点击画布取消高亮
     graph.on("canvas:click", () => {
       clearHighlight();
     });
+    return () => {
+      graph.destroy();
+      graphRef.current = null;
+    };
   }, [cloneData]);
 
   const clearHighlight = () => {

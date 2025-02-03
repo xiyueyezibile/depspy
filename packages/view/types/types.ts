@@ -61,6 +61,10 @@ export interface StaticStore {
   staticRoot: StaticNode;
   staticRootLoading: boolean;
   highlightedNodeIds: Set<string>;
+  gitChangedNodes: Set<string>;
+  importChangedNodes: Set<string>;
+  setGitChangedNodes: (nodeIds: Set<string>) => void;
+  setImportChangedNodes: (nodeIds: Set<string>) => void;
   setHighlightedNodeIds: (nodeIds: Set<string>) => void;
   setStaticRoot: (staticRoot: StaticNode) => void;
   setStaticRootLoading: (staticRootLoading: boolean) => void;
