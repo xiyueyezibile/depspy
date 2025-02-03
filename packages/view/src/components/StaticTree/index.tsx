@@ -291,6 +291,7 @@ function G6RegisterNode() {
             y: 0,
             width: 100,
             height: 20,
+            fill: "transparent", // 添加透明填充色确保点击区域覆盖整个矩形
             stroke: "rgb(167,167,167)",
             radius: 5,
           },
