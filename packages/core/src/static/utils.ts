@@ -141,13 +141,22 @@ export function readFileSyncSafe(id: string) {
 export function isGitFileModified(filePath: string) {
   try {
     const output = execSync(
-      `git diff --quiet ${filePath} || echo "true"`,
+      `git status --porcelain ${normalizeIdToFilePath(filePath)}`,
     ).toString();
     if (output) {
       return true;
     }
-  } catch {
+  } catch (e) {
     return true;
   }
   return false;
+}
+
+// 通过git查询仓库根目录
+export function getGitRootPath() {
+  try {
+    return execSync("git rev-parse --show-toplevel").toString().trim();
+  } catch {
+    return process.cwd();
+  }
 }

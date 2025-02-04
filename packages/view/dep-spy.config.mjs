@@ -2,7 +2,7 @@ export default {
   depth: 3,
   size: false,
   entry: "",
-  script: "pnpm run build",
+  command: "pnpm run build",
   output: {
     graph: "ds.graph.json",
     staticGraph: "ds.static.json",

@@ -74,18 +74,19 @@ cli
 
 // 源码依赖
 cli
-  .command("static [script]", "解析项目源码依赖")
-  .option("--script <script>", "项目的构建命令", {
+  .command("static [command]", "解析项目源码依赖")
+  .option("--command <command>", "项目的构建命令", {
     type: ["string"],
   })
-  .action(async (script, options) => {
+  .action(async (command, options) => {
+    // 获取最终的配置文件
     options = await conformConfig(options);
-    // 无命名参数优先
-    if (script) {
-      options.script = script;
+    // 命令行参数优先级高于配置文件
+    if (command) {
+      options.command = command;
     }
     // 关键参数检测
-    if (!options.script) {
+    if (!options.command) {
       throw new Error(
         red("缺少项目的构建命令,请通过命令行参数或者配置文件添加"),
       );
@@ -97,7 +98,13 @@ cli
     process.env[DEP_SPY_START] = "true";
     // 启动服务器，准备接收插件数据
     createStaticServer();
-    exec(options.script, { cwd: process.cwd() }, (_, std) => {
+    exec(options.command, { cwd: process.cwd() }, (error, std) => {
+      // 命令执行错误
+      if (error) {
+        console.log(red("构建命令执行错误"));
+        console.error(error);
+      }
+      // 命令执行的输出
       console.log(std);
       spinner.stop();
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));

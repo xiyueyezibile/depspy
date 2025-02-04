@@ -1,20 +1,13 @@
 import { jsonsToBuffer } from "@dep-spy/utils";
-import { existsSync, readFileSync, writeFileSync } from "fs";
-import path from "path";
 import http from "http";
 import { ExportEffectedNode } from "./getAllExportEffected";
-
-export interface Config {
-  root: string;
-  entry?: string;
-}
+import { getGitRootPath } from "./utils";
+import { PluginConfig } from "./vitePluginInsight";
 
 export const externals = ["node_modules"];
 
 export function idInExternals(id: string) {
   return externals.some((external) => {
-    // if(id.includes(external)) console.log(id);
-
     return id.includes(external);
   });
 }
@@ -36,11 +29,20 @@ interface ModuleTree {
   path: string[];
   idpath: string[];
   rootId?: string;
+  // 该文件对比上次git提交是否有改动
   isGitChange: boolean;
+  // 该文件的引入是否有改动
   isImportChange: boolean;
+  // 该文件的副作用是否有改动（只限于非js类型）
+  isSideEffectChange: boolean;
   removedExports: string[];
   renderedExports: string[];
+  // 该文件的哪些导出有改动
   changedExports: string[];
+  // 该文件的哪些导入有改动, 例如 { './a': ['a','default'] }
+  changedImports: {
+    [source: string]: string[];
+  };
 }
 
 class Module {
@@ -75,7 +77,9 @@ class ModuleGraph {
   private _moduleIds = new Map<string, number>();
   constructor(bundle: Bundle, map: Record<string, any>) {
     this.bundle = bundle;
-    Object.entries(map).forEach(([key, value]) => {
+    this.rootId = getGitRootPath();
+    // 绝对路径=>模块节点的映射（现在还是空壳）
+    Object.entries(map).forEach(([key]) => {
       this.graph.set(key, new Module(key));
     });
   }
@@ -103,7 +107,7 @@ class ModuleGraph {
   }
 
   buildGraph() {
-    this.graph.forEach((module, key) => {
+    this.graph.forEach((module) => {
       const id = module.id;
       if (this.importedIds.has(id)) {
         const importedIds = this.importedIds.get(id);
@@ -224,9 +228,19 @@ class ModuleGraph {
       renderedExports: [],
       isGitChange: Boolean(exportEffect?.isGitChange),
       isImportChange: Boolean(exportEffect?.isImportChange),
+      isSideEffectChange: Boolean(exportEffect?.isSideEffectChange),
       changedExports: exportEffect
         ? Array.from(exportEffect.exportEffectedNames)
         : [],
+      changedImports: Array.from(
+        exportEffect?.importEffectedNames.entries() || [],
+      ).reduce((pre, [key, value]) => {
+        // map转对象
+        return {
+          ...pre,
+          [key]: Array.from(value),
+        };
+      }, {}),
     };
 
     if (!parent) tree.rootId = this.rootId;
@@ -243,6 +257,7 @@ class ModuleGraph {
       }
       // 遍历导入模块
       tree.children = rootModule.importedIds
+        .concat(rootModule.dynamicallyImportedIds)
         .map((module) => {
           let kid: ModuleTree | null = null;
           kid = this.transform(module.id, depth - 1, tree);
@@ -259,12 +274,13 @@ class ModuleGraph {
     }
     return tree;
   }
-  tileTree(tree: ModuleTree) {
+  private tileTree(tree: ModuleTree) {
     tree.children.forEach((child) => {
       this.tileTree(child);
     });
     this.tiledTree.push({ ...tree, children: [] });
   }
+  /** 生成铺平的树 */
   generateTiledTreeByRootId(entryId: string = this.entryId) {
     if (this.graph.has(entryId)) {
       const rootTree = this.transform(entryId);
@@ -324,16 +340,11 @@ export class Bundle {
   loadModules = new Map<string, any>();
   noBundleModules = new Map<string, any>();
 
-  options: Config;
+  options: PluginConfig;
   allExportEffected: Map<string, ExportEffectedNode>;
 
-  constructor(options: Config) {
+  constructor(options: PluginConfig) {
     this.options = options;
-
-    const jsonName = "moduleTree.json";
-    const jsonPath = path.join(options.root, jsonName);
-    if (!existsSync(jsonPath))
-      writeFileSync(jsonPath, JSON.stringify([], null, 2));
   }
 
   /** 获取实际被打包的模块 */

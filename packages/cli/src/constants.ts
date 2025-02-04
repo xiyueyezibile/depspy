@@ -4,7 +4,7 @@ export const defaultConfig = {
   depth: 3,
   size: false,
   entry: "",
-  script: "",
+  command: "",
   output: {
     graph: "ds.graph.json",
     staticGraph: "ds.static.json",
