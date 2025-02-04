@@ -41,8 +41,8 @@ export const Sidebar = () => {
         onClick={() => setChoose("global")}
         className={
           choose === "global"
-            ? "sidebar-choose-item-active left-[calc(-3rem-3px)] top-[25vh]"
-            : "sidebar-choose-item left-[calc(-3rem-3px)] top-[25vh]"
+            ? "static-sidebar-choose-item-active left-[calc(-3rem-3px)] top-[25vh]"
+            : "static-sidebar-choose-item left-[calc(-3rem-3px)] top-[25vh]"
         }
       >
         {t("static.sidebar.choose.global")}
@@ -51,8 +51,8 @@ export const Sidebar = () => {
         onClick={() => setChoose("selected")}
         className={
           choose === "selected"
-            ? "sidebar-choose-item-active left-[calc(-3rem-3px)] bottom-[25vh]"
-            : "sidebar-choose-item left-[calc(-3rem-3px)] bottom-[25vh]"
+            ? "static-sidebar-choose-item-active left-[calc(-3rem-3px)] bottom-[25vh]"
+            : "static-sidebar-choose-item left-[calc(-3rem-3px)] bottom-[25vh]"
         }
       >
         {t("static.sidebar.choose.select")}

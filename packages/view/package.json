@@ -33,7 +33,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@dep-spy/cli": "link:D:/battlefield/xiyueyezibile-depspy/packages/cli",
+    "@dep-spy/cli": "link:../cli",
     "@iconify-json/carbon": "^1.1.20",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",

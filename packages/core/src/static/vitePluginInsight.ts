@@ -5,7 +5,7 @@ import { normalizePath, type PluginOption } from "vite";
 import getAllExportEffected, {
   ExportEffectedNode,
 } from "./getAllExportEffected";
-import { DEP_SPY_SUB_START } from "../constant";
+import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
 import { writeFileSync } from "fs";
 
 export interface PluginConfig {
@@ -13,10 +13,10 @@ export interface PluginConfig {
   buildCommand?: string;
 }
 export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
-  // 只能通过ds命令运行
-  // if (!process.env[DEP_SPY_START]) {
-  //   return false;
-  // }
+  //只能通过ds命令运行;
+  if (!process.env[DEP_SPY_START]) {
+    return false;
+  }
   // 避免子模块运行导致多次运行
   if (process.env[DEP_SPY_SUB_START]) {
     return false;

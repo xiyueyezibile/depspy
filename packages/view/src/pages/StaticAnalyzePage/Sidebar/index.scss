@@ -1,4 +1,4 @@
-.sidebar-choose-item {
+.static-static-sidebar-choose-item {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -15,14 +15,14 @@
     text-orientation: upright;
   }
 
-  .sidebar-choose-item:hover {
+  .static-sidebar-choose-item:hover {
     background-color: var(--color-bg-container);
     transition: 0.5s;
   }
 
-  .sidebar-choose-item-active {
+  .static-sidebar-choose-item-active {
     /* stylelint-disable-next-line at-rule-no-unknown */
-    @extend .sidebar-choose-item;
+    @extend .static-sidebar-choose-item;
 
     background-color: var(--color-bg-container);
   }
