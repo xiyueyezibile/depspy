@@ -4,6 +4,7 @@ import { parseNodeBuffer, generateTree } from "@/utils/parseBufferToTree.ts";
 import { stringifyObjToParams } from "@/utils/stringifyObjToParams.ts";
 
 const baseUrl = "http://localhost:2023";
+const staticBaseUrl = "http://localhost:2025";
 
 const maxPoolSize = 12;
 // 限制全展开时的并发数量
@@ -117,9 +118,18 @@ export const getNodeByPath = async (query: {
   };
 };
 
+// export const getStaticGraph = async () => {
+//   const res = await fetch(`${baseUrl}/getStaticTree`, {
+//     method: "GET",
+//   });
+//   console.log(res);
+// };
+
 export const getStaticGraph = async () => {
-  const res = await fetch(`${baseUrl}/getStaticTree`, {
+  const res = await fetch(`${staticBaseUrl}/getStaticTree`, {
     method: "GET",
   });
-  console.log(res);
+  const reader = await res.arrayBuffer();
+  const treeLeaves = parseNodeBuffer(reader);
+  return treeLeaves;
 };
