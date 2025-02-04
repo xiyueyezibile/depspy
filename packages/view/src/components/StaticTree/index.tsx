@@ -101,6 +101,7 @@ export default function StaticTree() {
       container: "container",
       width,
       height,
+      // fitView: true,
       modes: {
         default: [
           {
@@ -170,13 +171,18 @@ export default function StaticTree() {
     graph.data(cloneData);
     graph.render();
     circleMap.forEach((v, k) => {
-      graph.addItem("edge", {
-        source: k,
-        target: v,
-        type: "circle-line",
-      });
+      if (graph.findById(v) && graph.findById(k)) {
+        graph.addItem("edge", {
+          source: k,
+          target: v,
+          type: "circle-line",
+        });
+      }
     });
-    graph.fitView();
+    // graph.fitView();
+    //居中
+    graph.translate(graph.getWidth() / 2 / 3, graph.getHeight() / 2 / 3);
+    graph.zoom(3);
 
     //注册事件 --> 折叠与展开 高亮节点
     graph.on("node:click", (e) => {
@@ -185,21 +191,31 @@ export default function StaticTree() {
         const item = e.item;
         if (!item) return;
         const model = item.getModel();
+        const matrix = graph.getGroup().getMatrix();
+
+        const zoom = graph.getZoom();
+        const offsetX = matrix[6] / zoom;
+        const offsetY = matrix[7] / zoom;
 
         graph.updateItem(item, {
           collapsed: !model.collapsed,
         });
         graph.changeData(cloneData);
         circleMap.forEach((v, k) => {
-          if (!graph.findById(v) || !graph.findById(k)) return;
-          graph.addItem("edge", {
-            source: k,
-            target: v,
-            type: "circle-line",
-          });
+          if (graph.findById(v) && graph.findById(k)) {
+            graph.addItem("edge", {
+              source: k,
+              target: v,
+              type: "circle-line",
+            });
+          }
         });
+        //保持在展开折叠后树节点位置不变
+        graph.translate(offsetX, offsetY);
+        graph.zoom(zoom);
         graph.refresh();
-        graph.fitView();
+
+        // graph.fitView();
       } else {
         e.stopPropagation();
         clearHighlight();
