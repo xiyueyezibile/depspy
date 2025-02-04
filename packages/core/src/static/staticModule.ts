@@ -12,10 +12,10 @@ export function idInExternals(id: string) {
   });
 }
 
-function logCircleModules(circleModules: Module[]) {
-  const str = circleModules.map((module) => module.id).join(" -> ");
-  console.log(`Circular dependency detected: ${str}`);
-}
+// function logCircleModules(circleModules: Module[]) {
+//   const str = circleModules.map((module) => module.id).join(" -> ");
+//   console.log(`Circular dependency detected: ${str}`);
+// }
 
 interface ModuleTree {
   children?: ModuleTree[];
@@ -294,6 +294,7 @@ class ModuleGraph {
       const rootTree = this.transform(entryId);
       return JSON.stringify(rootTree, null, 2);
     }
+    return "";
   }
 }
 

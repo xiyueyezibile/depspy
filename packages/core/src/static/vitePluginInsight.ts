@@ -1,11 +1,11 @@
 import path from "path";
 import { SourceToImportId } from "./utils";
 import { Bundle, idInExternals, postServerGraph } from "./staticModule";
-import { type PluginOption } from "vite";
+import { normalizePath, type PluginOption } from "vite";
 import getAllExportEffected, {
   ExportEffectedNode,
 } from "./getAllExportEffected";
-import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
+import { DEP_SPY_SUB_START } from "../constant";
 import { writeFileSync } from "fs";
 
 export interface PluginConfig {
@@ -14,9 +14,9 @@ export interface PluginConfig {
 }
 export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
   // 只能通过ds命令运行
-  if (!process.env[DEP_SPY_START]) {
-    return false;
-  }
+  // if (!process.env[DEP_SPY_START]) {
+  //   return false;
+  // }
   // 避免子模块运行导致多次运行
   if (process.env[DEP_SPY_SUB_START]) {
     return false;
@@ -30,12 +30,14 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
   return {
     name: "vite-plugin-insight",
     enforce: "pre",
-
+    config(config) {
+      config.build.write = false;
+    },
     configResolved(config) {
       //  设置入口绝对地址，默认是index.html
       options.entry = options?.entry
-        ? path.normalize(options.entry)
-        : path.resolve(config.root, "index.html");
+        ? normalizePath(options.entry)
+        : normalizePath(path.resolve(config.root, "index.html"));
       // 初始化
       globalBundle = new Bundle(options);
     },
@@ -124,11 +126,10 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
       const flatTree = moduleGraph.generateTiledTreeByRootId(options.entry);
       // 默认分块长度
       const chunkLen = 80;
-
       // 分块发送数据给服务器
       try {
         await Promise.all(
-          new Array(Math.ceil(flatTree.length / chunkLen))
+          new Array(Math.ceil(flatTree?.length / chunkLen))
             .fill(0)
             .map((_, i) => {
               return postServerGraph(

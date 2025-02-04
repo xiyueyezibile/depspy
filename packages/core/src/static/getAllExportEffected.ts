@@ -1,4 +1,4 @@
-import { build, UserConfig } from "vite";
+import { build } from "vite";
 import path from "path";
 import {
   findSourceToImportsFormAst,
@@ -84,7 +84,7 @@ export default async function getAllExportEffect(
   // 该文件引入的所有依赖（静态引入 + 动态引入）
   const allImportIds = [
     ...(currentInfo?.importedIds || []),
-    ...(currentInfo.dynamicallyImportedIds || []),
+    ...(currentInfo?.dynamicallyImportedIds || []),
   ];
   allImportIds.forEach((importedId) => {
     // 循环依赖直接退出（ TODO: 是否能以函数粒度继续分析 ）
@@ -209,7 +209,7 @@ export default async function getAllExportEffect(
     }
 
     // 检查该文件依赖的静态引入是否变动
-    currentInfo.importedIds.forEach((importId) => {
+    currentInfo?.importedIds.forEach((importId) => {
       const exportEffected = importIdToExportEffected.get(importId);
       // 1. 该引入有改动的导出有变化 2. 该引入副作用有变化
       if (
