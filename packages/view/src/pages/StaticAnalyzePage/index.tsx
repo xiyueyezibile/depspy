@@ -7,7 +7,7 @@ import moduleTree from "../../../moduleTree.json";
 import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import Tool from "./Tool";
-import { traverseTree } from "./utils";
+import { traverseTree, buildTree } from "./utils";
 
 export default function StaticAnalyzePage() {
   const {
@@ -19,8 +19,7 @@ export default function StaticAnalyzePage() {
   } = useStaticStore();
 
   async function init() {
-    const tree = moduleTree;
-
+    const tree = buildTree(moduleTree);
     setStaticRoot(tree);
   }
   useEffect(() => {

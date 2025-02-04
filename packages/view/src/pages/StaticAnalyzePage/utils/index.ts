@@ -24,3 +24,38 @@ export const traverseTree = (node, callback) => {
     traverseTree(child, callback);
   }
 };
+
+export const buildTree = (nodes) => {
+  const cloneNodes = JSON.parse(JSON.stringify(nodes));
+  const nodeMap = new Map();
+  let root = null;
+  cloneNodes.forEach((node) => {
+    node.pathId && (node.id = node.pathId + "-" + node.id);
+  });
+  cloneNodes.forEach((node) => {
+    nodeMap.set(node.id, { ...node, children: [] });
+  });
+  cloneNodes.forEach((node) => {
+    const parentId = node.parentId;
+    if (parentId) {
+      const parent = nodeMap.get(parentId);
+      if (parent) {
+        parent.children.push(nodeMap.get(node.id)); // 挂载到父节点
+      } else {
+        root = nodeMap.get(node.id); // 父节点不存在，作为根节点
+      }
+    } else {
+      root = nodeMap.get(node.id); // 无 parentId，直接为根节点
+    }
+  });
+  traverseTree(root, (node) => {
+    if (node.id.includes("-")) {
+      const [pathId, id] = node.id.split("-");
+      if (pathId) {
+        node.pathId = pathId;
+        node.id = id;
+      }
+    }
+  });
+  return root;
+};

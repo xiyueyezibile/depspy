@@ -69,7 +69,7 @@ export default function StaticTree() {
       }
       subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
       //初始化折叠状态
-      // subTree.collapsed = subTree.depth > 0 ? true : false;
+      subTree.collapsed = subTree.depth > 0 ? true : false;
       return true;
     });
     setCloneData(newData);
@@ -159,7 +159,7 @@ export default function StaticTree() {
           return 80;
         },
       },
-      fitViewPadding: [200, 200, 200, 200],
+      fitViewPadding: [50, 450, 50, 50],
       plugins: [tooltip],
     });
 
