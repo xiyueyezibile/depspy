@@ -1,6 +1,6 @@
 import SidebarButton from "../components/SidebarButton";
 import { useStaticStore } from "@/contexts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { shallow } from "zustand/shallow";
 import { extractFileName } from "../../utils";
 
@@ -16,33 +16,87 @@ export const Global = () => {
       shallow,
     );
 
-  const gitFileList = useMemo(() => {
-    return Array.from(gitChangedNodes).map((item) => (
-      <div
-        key={item}
-        className="p-2 hover:bg-gray-100 rounded hover:text-blue-500 min-w-80 cursor-pointer"
-        data-path={item}
-      >
-        📄 {extractFileName(item)}
-      </div>
-    ));
+  const [gitMap, setGitMap] = useState<Map<string, Set<string>>>(new Map());
+  const [importMap, setImportMap] = useState<Map<string, Set<string>>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    if (!gitChangedNodes.size) return;
+    const newMap = new Map<string, Set<string>>();
+    gitChangedNodes.forEach((item) => {
+      const fileName = extractFileName(item);
+      const parts = fileName.split("-");
+      if (parts.length > 0) {
+        const pathId = parts[0];
+        if (!newMap.has(pathId)) {
+          newMap.set(pathId, new Set([item]));
+        } else {
+          newMap.get(pathId)?.add(item);
+        }
+      }
+    });
+    setGitMap(newMap);
   }, [gitChangedNodes]);
 
-  const importFileList = useMemo(() => {
-    return Array.from(importChangedNodes).map((item) => (
+  useEffect(() => {
+    if (!importChangedNodes.size) return;
+    const newMap = new Map<string, Set<string>>();
+    importChangedNodes.forEach((item) => {
+      const fileName = extractFileName(item);
+      const parts = fileName.split("-");
+      if (parts.length > 0) {
+        const pathId = parts[0];
+        if (!newMap.has(pathId)) {
+          newMap.set(pathId, new Set([item]));
+        } else {
+          newMap.get(pathId)?.add(item);
+        }
+      }
+    });
+    setImportMap(newMap);
+  }, [importChangedNodes]);
+
+  const gitFileList = useMemo(() => {
+    return Array.from(gitMap.keys()).map((item) => (
       <div
         key={item}
         className="p-2 hover:bg-gray-100 rounded hover:text-blue-500 min-w-80 cursor-pointer"
         data-path={item}
       >
-        ⚡ {extractFileName(item)}
+        📄 {item}
       </div>
     ));
-  }, [importChangedNodes]);
+  }, [gitMap]);
+
+  const importFileList = useMemo(() => {
+    return Array.from(importMap.keys()).map((item) => (
+      <div
+        key={item}
+        className="p-2 hover:bg-gray-100 rounded hover:text-blue-500 min-w-80 cursor-pointer"
+        data-path={item}
+      >
+        ⚡ {item}
+      </div>
+    ));
+  }, [importMap]);
 
   const totalCount = useMemo(() => {
     return activeTab === "git" ? gitChangedNodes.size : importChangedNodes.size;
-  }, [activeTab, gitChangedNodes.size, importChangedNodes.size]);
+  }, [activeTab, gitMap.size, importMap.size]);
+
+  const handleFileListClick = useCallback(
+    (e) => {
+      const path = e.target.dataset.path || "";
+      if (!path) return;
+      if (activeTab === "git") {
+        setHighlightedNodeIds(new Set(gitMap.get(path)));
+      } else if (activeTab === "import") {
+        setHighlightedNodeIds(new Set(importMap.get(path)));
+      }
+    },
+    [gitMap, importMap, activeTab, setHighlightedNodeIds],
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -60,14 +114,7 @@ export const Global = () => {
         当前数量：<span className="text-blue-500">{totalCount}</span>
       </div>
 
-      <div
-        className="flex-1 overflow-auto p-4"
-        onClick={(e) => {
-          const path = e.target.dataset.path;
-          if (!path) return;
-          setHighlightedNodeIds(new Set([path]));
-        }}
-      >
+      <div className="flex-1 overflow-auto p-4" onClick={handleFileListClick}>
         {activeTab === "git" && (
           <div className="space-y-2">
             {gitFileList.length > 0 ? (

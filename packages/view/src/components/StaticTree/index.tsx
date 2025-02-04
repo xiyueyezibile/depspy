@@ -69,7 +69,7 @@ export default function StaticTree() {
       }
       subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
       //初始化折叠状态
-      subTree.collapsed = subTree.depth > 0 ? true : false;
+      // subTree.collapsed = subTree.depth > 0 ? true : false;
       return true;
     });
     setCloneData(newData);
@@ -181,8 +181,7 @@ export default function StaticTree() {
     });
     // graph.fitView();
     //居中
-    graph.translate(graph.getWidth() / 2 / 3, graph.getHeight() / 2 / 3);
-    graph.zoom(3);
+    graph.translate(graph.getWidth() / 2, graph.getHeight() / 2);
 
     //注册事件 --> 折叠与展开 高亮节点
     graph.on("node:click", (e) => {
