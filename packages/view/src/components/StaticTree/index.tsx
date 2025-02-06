@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as G6 from "@antv/g6";
 import { useStaticStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
@@ -24,6 +24,38 @@ export default function StaticTree() {
 
   // console.log(staticRoot);
 
+  const expandNode = useCallback(
+    (item: G6.Node, flag: boolean) => {
+      if (!graphRef.current) return;
+      const model = item.getModel();
+      if (!model.collapsed) return;
+      const matrix = graphRef.current.getGroup().getMatrix();
+
+      const zoom = graphRef.current.getZoom();
+      const offsetX = matrix[6] / zoom;
+      const offsetY = matrix[7] / zoom;
+
+      graphRef.current.updateItem(item, {
+        collapsed: !flag,
+      });
+      graphRef.current.changeData(cloneData);
+      circleMap.forEach((k, v) => {
+        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+          graphRef.current.addItem("edge", {
+            source: k,
+            target: v,
+            type: "circle-line",
+          });
+        }
+      });
+      //保持在展开折叠后树节点位置不变
+      graphRef.current.translate(offsetX, offsetY);
+      graphRef.current.zoom(zoom);
+      graphRef.current.refresh();
+    },
+    [graphRef, cloneData, circleMap],
+  );
+
   useEffect(() => {
     //清除所有item的高亮状态
     highlightedNodeIdsRef.current = highlightedNodeIds;
@@ -38,8 +70,13 @@ export default function StaticTree() {
       graphRef.current.setItemState(edge, "highlight", false);
       graphRef.current.refreshItem(edge);
     });
+
     //为当前item添加高亮状态
     highlightedNodeIds.forEach((id) => {
+      // 先尝试展开节点
+      const rawItem = graphRef.current.findById(id) as G6.Node;
+      if (rawItem) expandNode(rawItem, true);
+
       const item = graphRef.current.findById(id) as G6.Node;
       if (!item) return;
       const relatedEdges = item?.getEdges() || [];
@@ -80,7 +117,7 @@ export default function StaticTree() {
       }
       subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
       //初始化折叠状态
-      // subTree.collapsed = subTree.depth > 0 ? true : false;
+      subTree.collapsed = false;
       return true;
     });
     setCloneData(newData);
