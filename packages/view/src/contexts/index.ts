@@ -96,6 +96,12 @@ export const useStaticStore = createWithEqualityFn<StaticStore>()(
     highlightedNodeIds: new Set(),
     gitChangedNodes: new Set(),
     importChangedNodes: new Set(),
+    showGitChangedNodes: false,
+    showImportChangedNodes: false,
+    setShowGitChangedNodes: (showGitChangedNodes: boolean) =>
+      set({ showGitChangedNodes }),
+    setShowImportChangedNodes: (showImportChangedNodes: boolean) =>
+      set({ showImportChangedNodes }),
     setGitChangedNodes: (gitChangedNodes: Set<string>) =>
       set({ gitChangedNodes }),
     setImportChangedNodes: (importChangedNodes: Set<string>) =>

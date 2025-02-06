@@ -2,19 +2,38 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as G6 from "@antv/g6";
 import { useStaticStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
+import { shallow } from "zustand/shallow";
+
+const State = Object.freeze({
+  HIGHLIGHTE: "highlight",
+  GIT: "gitChanged",
+  IMPORT: "importChanged",
+});
 
 export default function StaticTree() {
   const {
     staticRoot,
+    showGitChangedNodes,
+    showImportChangedNodes,
+    gitChangedNodes,
+    importChangedNodes,
     // setStaticRoot,
     setHighlightedNodeIds,
     highlightedNodeIds,
-  } = useStaticStore((state) => ({
-    staticRoot: state.staticRoot,
-    setStaticRoot: state.setStaticRoot,
-    highlightedNodeIds: state.highlightedNodeIds,
-    setHighlightedNodeIds: state.setHighlightedNodeIds,
-  }));
+  } = useStaticStore(
+    (state) => ({
+      staticRoot: state.staticRoot,
+      showGitChangedNodes: state.showGitChangedNodes,
+      showImportChangedNodes: state.showImportChangedNodes,
+      setShowGitChangedNodes: state.setShowGitChangedNodes,
+      gitChangedNodes: state.gitChangedNodes,
+      importChangedNodes: state.importChangedNodes,
+      setStaticRoot: state.setStaticRoot,
+      highlightedNodeIds: state.highlightedNodeIds,
+      setHighlightedNodeIds: state.setHighlightedNodeIds,
+    }),
+    shallow,
+  );
   const graphRef = useRef<G6.TreeGraph>();
   const [cloneData, setCloneData] = useState();
   const [circleMap, setCircleMap] = useState(new Map());
@@ -24,38 +43,6 @@ export default function StaticTree() {
 
   // console.log(staticRoot);
 
-  const expandNode = useCallback(
-    (item: G6.Node, flag: boolean) => {
-      if (!graphRef.current) return;
-      const model = item.getModel();
-      if (!model.collapsed) return;
-      const matrix = graphRef.current.getGroup().getMatrix();
-
-      const zoom = graphRef.current.getZoom();
-      const offsetX = matrix[6] / zoom;
-      const offsetY = matrix[7] / zoom;
-
-      graphRef.current.updateItem(item, {
-        collapsed: !flag,
-      });
-      graphRef.current.changeData(cloneData);
-      circleMap.forEach((k, v) => {
-        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-          graphRef.current.addItem("edge", {
-            source: k,
-            target: v,
-            type: "circle-line",
-          });
-        }
-      });
-      //保持在展开折叠后树节点位置不变
-      graphRef.current.translate(offsetX, offsetY);
-      graphRef.current.zoom(zoom);
-      graphRef.current.refresh();
-    },
-    [graphRef, cloneData, circleMap],
-  );
-
   useEffect(() => {
     //清除所有item的高亮状态
     highlightedNodeIdsRef.current = highlightedNodeIds;
@@ -63,11 +50,11 @@ export default function StaticTree() {
     const nodes = graphRef.current.getNodes();
     const edges = graphRef.current.getEdges();
     nodes.forEach((node) => {
-      graphRef.current.setItemState(node, "highlight", false);
+      graphRef.current.setItemState(node, State.HIGHLIGHTE, false);
       graphRef.current.refreshItem(node);
     });
     edges.forEach((edge) => {
-      graphRef.current.setItemState(edge, "highlight", false);
+      graphRef.current.setItemState(edge, State.HIGHLIGHTE, false);
       graphRef.current.refreshItem(edge);
     });
 
@@ -80,19 +67,19 @@ export default function StaticTree() {
       const item = graphRef.current.findById(id) as G6.Node;
       if (!item) return;
       const relatedEdges = item?.getEdges() || [];
-      graphRef.current.setItemState(item, "highlight", true);
+      graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
       graphRef.current.refreshItem(item);
       relatedEdges.forEach((edge) => {
         const {
           _cfg: { currentShape },
         } = edge;
         if (currentShape === "custom-polyline") {
-          graphRef.current.setItemState(edge, "highlight", true);
+          graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
           graphRef.current.refreshItem(edge);
         } else {
           //判断当前节点是否是起点
           if (edge.getSource().getModel().id === item.getModel().id) {
-            graphRef.current.setItemState(edge, "highlight", true);
+            graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
             graphRef.current.refreshItem(edge);
           }
         }
@@ -134,7 +121,7 @@ export default function StaticTree() {
         const model = e.item._cfg.model;
         const outDiv = document.createElement("div");
         outDiv.style.width = "fit-content";
-        outDiv.innerHTML = model.name as string;
+        outDiv.innerHTML = model.pathId as string;
         return outDiv;
       },
       itemTypes: ["node"],
@@ -179,10 +166,24 @@ export default function StaticTree() {
           stroke: "yellow",
           lineWidth: 2,
         },
+        gitChanged: {
+          stroke: "green",
+          lineWidth: 2,
+        },
+        importChanged: {
+          stroke: "blue",
+          lineWidth: 2,
+        },
       },
       edgeStateStyles: {
         highlight: {
           stroke: "yellow",
+        },
+        gitChanged: {
+          stroke: "green",
+        },
+        importChanged: {
+          stroke: "blue",
         },
       },
       defaultNode: {
@@ -289,9 +290,20 @@ export default function StaticTree() {
     };
   }, [cloneData]);
 
-  const clearHighlight = () => {
-    setHighlightedNodeIds(new Set());
-  };
+  useEffect(() => {
+    handleNodeState(gitChangedNodes, State.GIT, showGitChangedNodes);
+    // 如果取消当前节点的git状态，则再次执行import状态，以防止git状态的取消影响到import状态
+    if (showImportChangedNodes && !showGitChangedNodes) {
+      handleNodeState(importChangedNodes, State.IMPORT, showImportChangedNodes);
+    }
+  }, [showGitChangedNodes]);
+
+  useEffect(() => {
+    handleNodeState(importChangedNodes, State.IMPORT, showImportChangedNodes);
+    if (showGitChangedNodes && !showImportChangedNodes) {
+      handleNodeState(gitChangedNodes, State.GIT, showGitChangedNodes);
+    }
+  }, [showImportChangedNodes]);
 
   useEffect(() => {
     if (!window) return;
@@ -308,6 +320,86 @@ export default function StaticTree() {
       window.onresize = null;
     };
   }, []);
+
+  const expandNode = useCallback(
+    (item: G6.Node, flag: boolean) => {
+      if (!graphRef.current) return;
+      const model = item.getModel();
+      if (!model.collapsed) return;
+      const matrix = graphRef.current.getGroup().getMatrix();
+
+      const zoom = graphRef.current.getZoom();
+      const offsetX = matrix[6] / zoom;
+      const offsetY = matrix[7] / zoom;
+
+      graphRef.current.updateItem(item, {
+        collapsed: !flag,
+      });
+      graphRef.current.changeData(cloneData);
+      circleMap.forEach((k, v) => {
+        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+          graphRef.current.addItem("edge", {
+            source: k,
+            target: v,
+            type: "circle-line",
+          });
+        }
+      });
+      //保持在展开折叠后树节点位置不变
+      graphRef.current.translate(offsetX, offsetY);
+      graphRef.current.zoom(zoom);
+      graphRef.current.refresh();
+    },
+    [graphRef, cloneData, circleMap],
+  );
+
+  const handleNodeState = (
+    nodeIds: Set<string>,
+    type: string,
+    showNodes: boolean,
+  ) => {
+    if (!graphRef.current) return;
+    clearHighlight();
+    if (showNodes) {
+      nodeIds.forEach((id) => {
+        const node = graphRef.current.findById(id) as G6.Node;
+        if (node) {
+          clearState(node);
+          node.setState(type, true);
+          graphRef.current.refreshItem(node);
+          const relatedEdges = node.getEdges();
+          relatedEdges.forEach((edge) => {
+            clearState(edge);
+            edge.setState(type, true);
+            graphRef.current.refreshItem(edge);
+          });
+        }
+      });
+    } else {
+      nodeIds.forEach((id) => {
+        const node = graphRef.current.findById(id) as G6.Node;
+        if (node) {
+          clearState(node);
+          graphRef.current.refreshItem(node);
+          const relatedEdges = node.getEdges();
+          relatedEdges.forEach((edge) => {
+            clearState(edge);
+            graphRef.current.refreshItem(edge);
+          });
+        }
+      });
+    }
+  };
+  const clearHighlight = () => {
+    setHighlightedNodeIds(new Set());
+  };
+
+  const clearState = (item: G6.Node | G6.IEdge) => {
+    Object.values(State).forEach((state) => {
+      item.setState(state, false);
+      graphRef.current.refreshItem(item);
+    });
+  };
 
   return (
     <div id="container" ref={containerRef} className="w-100vw h-100vh"></div>
@@ -413,8 +505,12 @@ function G6RegisterNode() {
 
       let strokeColor = "rgb(167,167,167)";
       const edge = group.get("item");
-      if (edge.hasState("highlight")) {
+      if (edge.hasState(State.HIGHLIGHTE)) {
         strokeColor = "yellow";
+      } else if (edge.hasState(State.GIT)) {
+        strokeColor = "green";
+      } else if (edge.hasState(State.IMPORT)) {
+        strokeColor = "blue";
       }
       const shape = group.addShape("path", {
         attrs: {
@@ -440,8 +536,12 @@ function G6RegisterNode() {
 
       let strokeColor = "red";
       const edge = group.get("item");
-      if (edge.hasState("highlight")) {
+      if (edge.hasState(State.HIGHLIGHTE)) {
         strokeColor = "yellow";
+      } else if (edge.hasState(State.GIT)) {
+        strokeColor = "green";
+      } else if (edge.hasState(State.IMPORT)) {
+        strokeColor = "blue";
       }
       const shape = group.addShape("line", {
         attrs: {
@@ -451,6 +551,7 @@ function G6RegisterNode() {
           y2: endPoint.y,
           stroke: strokeColor,
           lineWidth: 2, // 线宽
+          // endArrow: true,
         },
         name: "circle-line-path",
       });

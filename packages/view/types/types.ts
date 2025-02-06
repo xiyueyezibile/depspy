@@ -63,6 +63,10 @@ export interface StaticStore {
   highlightedNodeIds: Set<string>;
   gitChangedNodes: Set<string>;
   importChangedNodes: Set<string>;
+  showGitChangedNodes: boolean;
+  showImportChangedNodes: boolean;
+  setShowGitChangedNodes: (flag: boolean) => void;
+  setShowImportChangedNodes: (flag: boolean) => void;
   setGitChangedNodes: (nodeIds: Set<string>) => void;
   setImportChangedNodes: (nodeIds: Set<string>) => void;
   setHighlightedNodeIds: (nodeIds: Set<string>) => void;

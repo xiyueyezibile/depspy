@@ -40,7 +40,7 @@ export const Sidebar = () => {
       <div
         onClick={() => setChoose("global")}
         className={
-          choose === "global"
+          choose === "selected"
             ? "static-sidebar-choose-item-active left-[calc(-3rem-3px)] top-[25vh]"
             : "static-sidebar-choose-item left-[calc(-3rem-3px)] top-[25vh]"
         }
@@ -50,7 +50,7 @@ export const Sidebar = () => {
       <div
         onClick={() => setChoose("selected")}
         className={
-          choose === "selected"
+          choose === "global"
             ? "static-sidebar-choose-item-active left-[calc(-3rem-3px)] bottom-[25vh]"
             : "static-sidebar-choose-item left-[calc(-3rem-3px)] bottom-[25vh]"
         }
