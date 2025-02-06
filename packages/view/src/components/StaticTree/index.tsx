@@ -46,8 +46,19 @@ export default function StaticTree() {
       graphRef.current.setItemState(item, "highlight", true);
       graphRef.current.refreshItem(item);
       relatedEdges.forEach((edge) => {
-        graphRef.current.setItemState(edge, "highlight", true);
-        graphRef.current.refreshItem(edge);
+        const {
+          _cfg: { currentShape },
+        } = edge;
+        if (currentShape === "custom-polyline") {
+          graphRef.current.setItemState(edge, "highlight", true);
+          graphRef.current.refreshItem(edge);
+        } else {
+          //判断当前节点是否是起点
+          if (edge.getSource().getModel().id === item.getModel().id) {
+            graphRef.current.setItemState(edge, "highlight", true);
+            graphRef.current.refreshItem(edge);
+          }
+        }
       });
     });
     // graphRef.current.refresh();
@@ -170,7 +181,7 @@ export default function StaticTree() {
 
     graph.data(cloneData);
     graph.render();
-    circleMap.forEach((v, k) => {
+    circleMap.forEach((k, v) => {
       if (graph.findById(v) && graph.findById(k)) {
         graph.addItem("edge", {
           source: k,
@@ -200,7 +211,7 @@ export default function StaticTree() {
           collapsed: !model.collapsed,
         });
         graph.changeData(cloneData);
-        circleMap.forEach((v, k) => {
+        circleMap.forEach((k, v) => {
           if (graph.findById(v) && graph.findById(k)) {
             graph.addItem("edge", {
               source: k,

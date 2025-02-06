@@ -26,14 +26,15 @@ export const Global = () => {
     const newMap = new Map<string, Set<string>>();
     gitChangedNodes.forEach((item) => {
       const fileName = extractFileName(item);
-      const parts = fileName.split("-");
-      if (parts.length > 0) {
-        const pathId = parts[0];
-        if (!newMap.has(pathId)) {
-          newMap.set(pathId, new Set([item]));
-        } else {
-          newMap.get(pathId)?.add(item);
-        }
+      // const parts = fileName.split("-");
+      //找到最后一个‘-’
+      const lastLineIndex = fileName.lastIndexOf("-");
+      const pathId = fileName.slice(0, lastLineIndex);
+
+      if (!newMap.has(pathId)) {
+        newMap.set(pathId, new Set([item]));
+      } else {
+        newMap.get(pathId)?.add(item);
       }
     });
     setGitMap(newMap);
@@ -44,14 +45,14 @@ export const Global = () => {
     const newMap = new Map<string, Set<string>>();
     importChangedNodes.forEach((item) => {
       const fileName = extractFileName(item);
-      const parts = fileName.split("-");
-      if (parts.length > 0) {
-        const pathId = parts[0];
-        if (!newMap.has(pathId)) {
-          newMap.set(pathId, new Set([item]));
-        } else {
-          newMap.get(pathId)?.add(item);
-        }
+      //找到最后一个‘-’
+      const lastLineIndex = fileName.lastIndexOf("-");
+      const pathId = fileName.slice(0, lastLineIndex);
+
+      if (!newMap.has(pathId)) {
+        newMap.set(pathId, new Set([item]));
+      } else {
+        newMap.get(pathId)?.add(item);
       }
     });
     setImportMap(newMap);
