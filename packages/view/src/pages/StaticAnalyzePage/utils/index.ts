@@ -50,7 +50,7 @@ export const buildTree = (nodes) => {
   });
   traverseTree(root, (node) => {
     if (node.id.includes("-")) {
-      const [pathId, id] = node.id.split("-");
+      const [pathId, id] = splitPath(node.id);
       if (pathId) {
         node.pathId = pathId;
         node.id = id;
@@ -59,3 +59,10 @@ export const buildTree = (nodes) => {
   });
   return root;
 };
+
+function splitPath(path: string) {
+  const lastLineIndex = path.lastIndexOf("-");
+  const pathId = path.slice(0, lastLineIndex);
+  const id = path.slice(lastLineIndex + 1);
+  return [pathId, id];
+}

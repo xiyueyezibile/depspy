@@ -31,10 +31,13 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
     name: "vite-plugin-insight",
     enforce: "pre",
     configResolved(config) {
+      if (process.env[DEP_SPY_SUB_START]) {
+        return;
+      }
       //  设置入口绝对地址，默认是index.html
       options.entry = options?.entry
         ? normalizePath(options.entry)
-        : normalizePath(path.resolve(config.root, "index.html"));
+        : normalizePath(path.join(config.root, "index.html"));
       // 初始化
       globalBundle = new Bundle(options);
       // 注入resolveId，保证第一个执行，不会被其他插件阶段
@@ -46,9 +49,6 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
       config.plugins?.unshift({
         name: "vite-plugin-gen-source-import-map",
         resolveId(id: string, importer: string) {
-          if (process.env[DEP_SPY_SUB_START]) {
-            return;
-          }
           // 调用下一个 resolveId 钩子获取输出
           return this.resolve(id, importer, {
             ...options,

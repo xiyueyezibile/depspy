@@ -302,20 +302,24 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
             /* @ts-ignore */
             config.plugins?.unshift({
               name: "vite-plugin-find-export-dependency-sub",
-              resolveId(id: string, _: string, options: { isEntry: boolean }) {
+              resolveId(
+                id: string,
+                importer: string,
+                options: { isEntry: boolean },
+              ) {
                 // 入口引入直接替换为虚拟模块
                 if (options.isEntry) {
                   return virtualImporterModuleId;
                 }
-                // 虚拟模块之间的引入
-                if (id in virtualModules) {
+                // 虚拟模块之间的引入（去除可能存在的查询参数)
+                const realId = normalizeIdToFilePath(id);
+                if (realId in virtualModules) {
                   return id;
                 }
-                // 其他标记为引入external，无需处理
                 return {
                   id,
                   external: true,
-                  moduleSideEffects: "no-treeshake",
+                  moduleSideEffects: true,
                 };
               },
             });

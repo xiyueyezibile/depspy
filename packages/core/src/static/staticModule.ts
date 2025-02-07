@@ -209,11 +209,10 @@ class ModuleGraph {
     }
     const nameArr = entryId.split("/");
     const exportEffect = this.bundle.allExportEffected.get(entryId);
-
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
       id: id,
-      pathId: entryId.slice(this.rootId.length), // 去掉根目录
+      pathId: entryId.slice(this.rootId.length) || entryId, // 1. 去掉根目录 2. 虚拟模块可能不存在真实路径
       depth: parent ? parent.depth + 1 : 0,
       name: nameArr
         .slice(nameArr.length >= 2 ? nameArr.length - 2 : 0)
