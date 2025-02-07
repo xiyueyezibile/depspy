@@ -23,7 +23,7 @@ export const Selected = () => {
     });
     const res: SelectNodeInfo[] = [];
     traverseTree(staticRoot, (node) => {
-      if (cloneSet.includes(node.pathId + "-" + node.id)) {
+      if (cloneSet.includes(node.id)) {
         res.push({
           name: node.name,
           removedExports: node.removedExports,

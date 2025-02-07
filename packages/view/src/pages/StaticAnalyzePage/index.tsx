@@ -36,10 +36,10 @@ export default function StaticAnalyzePage() {
       const rootPath = staticRoot.rootId;
       traverseTree(staticRoot, (node) => {
         if (node.isGitChange) {
-          gitChangeSet.add(rootPath + node.pathId + "-" + node.id);
+          gitChangeSet.add(rootPath + node.id);
         }
         if (node.isImportChange) {
-          importChangeSet.add(rootPath + node.pathId + "-" + node.id);
+          importChangeSet.add(rootPath + node.id);
         }
       });
       setGitChangedNodes(gitChangeSet);

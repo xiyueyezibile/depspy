@@ -98,11 +98,11 @@ export default function StaticTree() {
           if (subTree.path[i] === subTree.pathId) {
             const id = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
 
-            map.set(id, rootPath + subTree.pathId + "-" + subTree.id);
+            map.set(id, rootPath + subTree.id);
           }
         }
       }
-      subTree.id = rootPath + subTree.pathId + "-" + subTree.id;
+      subTree.id = rootPath + subTree.id;
       //初始化折叠状态
       subTree.collapsed = false;
       return true;

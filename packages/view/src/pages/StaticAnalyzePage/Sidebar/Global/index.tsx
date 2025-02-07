@@ -23,31 +23,28 @@ export const Global = () => {
 
   useEffect(() => {
     if (!gitChangedNodes.size) return;
-    const newMap = new Map<string, Set<string>>();
-    gitChangedNodes.forEach((item) => {
-      const fileName = extractFileName(item);
-      // const parts = fileName.split("-");
-      //找到最后一个‘-’
-      const lastLineIndex = fileName.lastIndexOf("-");
-      const pathId = fileName.slice(0, lastLineIndex);
-
-      if (!newMap.has(pathId)) {
-        newMap.set(pathId, new Set([item]));
-      } else {
-        newMap.get(pathId)?.add(item);
-      }
-    });
+    const newMap = geneRateNameToPath(gitChangedNodes);
     setGitMap(newMap);
   }, [gitChangedNodes]);
 
   useEffect(() => {
     if (!importChangedNodes.size) return;
+    const newMap = geneRateNameToPath(importChangedNodes);
+    setImportMap(newMap);
+  }, [importChangedNodes]);
+
+  const geneRateNameToPath = (nodes: Set<string>): Map<string, Set<string>> => {
     const newMap = new Map<string, Set<string>>();
-    importChangedNodes.forEach((item) => {
+    nodes.forEach((item) => {
       const fileName = extractFileName(item);
-      //找到最后一个‘-’
-      const lastLineIndex = fileName.lastIndexOf("-");
-      const pathId = fileName.slice(0, lastLineIndex);
+      let pathId = "";
+      if (fileName.includes("-")) {
+        const parts = fileName.split("-");
+        parts.pop();
+        pathId = parts.join("-");
+      } else {
+        pathId = fileName;
+      }
 
       if (!newMap.has(pathId)) {
         newMap.set(pathId, new Set([item]));
@@ -55,8 +52,8 @@ export const Global = () => {
         newMap.get(pathId)?.add(item);
       }
     });
-    setImportMap(newMap);
-  }, [importChangedNodes]);
+    return newMap;
+  };
 
   const gitFileList = useMemo(() => {
     return Array.from(gitMap.keys()).map((item) => (
@@ -103,11 +100,11 @@ export const Global = () => {
     <div className="h-full flex flex-col">
       <header className="flex gap-2 p-2 border-b">
         <SidebarButton onClick={() => setActiveTab("git")}>
-          Git 变动文件
+          Git 变更
         </SidebarButton>
 
         <SidebarButton onClick={() => setActiveTab("import")}>
-          导入变动文件
+          导入变更
         </SidebarButton>
       </header>
 
