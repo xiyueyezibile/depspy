@@ -5,6 +5,7 @@ import {
   getFileContentAtCommit,
   getHashFromString,
   isGitFileModified,
+  normalizeIdToFilePath,
   readFileSyncSafe,
   SourceToImportId,
 } from "./utils";
@@ -67,7 +68,8 @@ export default async function getAllExportEffect(
     paths.delete(entry);
     return importIdToExportEffected;
   }
-  const ext = path.extname(entry);
+  // 当前文件的后缀
+  const ext = path.extname(normalizeIdToFilePath(entry));
   // 如果是node_modules下的文件或者不是JS类型的源码，直接返回
   if (!targetExt.has(ext) || entry.includes("node_modules")) {
     const exportEffect: ExportEffectedNode = {
@@ -107,7 +109,6 @@ export default async function getAllExportEffect(
   });
   // 确保改文件的所有依赖都已经解析完成
   await Promise.all(importDepPromise);
-
   const preCode = getFileContentAtCommit(entry, "HEAD");
   const curCode = readFileSyncSafe(entry);
   const exportChanges: ExportEffectedNode = {
@@ -128,6 +129,7 @@ export default async function getAllExportEffect(
         exportName,
         ext,
       });
+
       const mergePromise = Promise.all([
         curTreeShakingCodePromise,
         preTreeShakingCodePromise,
@@ -162,7 +164,7 @@ export default async function getAllExportEffect(
                 // 构建exportChanges节点
                 exportChanges.isImportChange = true;
                 const importEffectedName =
-                  exportChanges.importEffectedNames.get(source);
+                  exportChanges.importEffectedNames.get(importId);
                 if (importEffectedName) {
                   importEffectedName.add(_import);
                 } else {
@@ -217,6 +219,8 @@ export default async function getAllExportEffect(
         exportEffected?.isSideEffectChange
       ) {
         exportChanges.isImportChange = true;
+        // 没有导出的文件，可以直接标记为副作用变动
+        exportChanges.isSideEffectChange = true;
         // 因为是html的script引入，所以默认为全量引入
         // 增量加入
         exportChanges.importEffectedNames.set(
@@ -238,14 +242,14 @@ export default async function getAllExportEffect(
 function constructImportStatement(importedId: string, importName: string) {
   // 处理默认导入
   if (importName === "default") {
-    return `import defaultName from '${importedId}';defaultName();`;
+    return `import defaultName from '${importedId}';console.log(defaultName);`;
   }
   // 处理命名空间导入
   if (importName === "*") {
-    return `import * as all from '${importedId}';all();`;
+    return `import * as all from '${importedId}';console.log(all);`;
   }
   // 处理具名导入
-  return `import { ${importName} } from '${importedId}';${importName}();`;
+  return `import { ${importName} } from '${importedId}';console.log(${importName});`;
 }
 // 获取指定导出真正依赖的源码和真正依赖的引入（复用vite的treeshaking规范）
 interface GetTreeShakingDetailOptions {
@@ -256,8 +260,8 @@ interface GetTreeShakingDetailOptions {
 // 通过vite的treeshaking规范获取指定导出真正依赖的源码和真正依赖的引入
 async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
   const { code, exportName, ext } = options;
-  const virtualSourceModuleId = `virtual:source${ext ? `${ext}` : ""}`;
-  const virtualImporterModuleId = "virtual:importer";
+  const virtualSourceModuleId = `virtual:source${ext}`;
+  const virtualImporterModuleId = `virtual:importer.js`;
   const virtualModules = {
     [virtualSourceModuleId]: code,
     [virtualImporterModuleId]: constructImportStatement(
@@ -285,34 +289,45 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
       },
       plugins: [
         {
-          name: "find-export-dependency",
+          name: "vite-plugin-find-export-dependency",
           enforce: "pre",
           buildStart() {
             process.env[DEP_SPY_SUB_START] = "true";
           },
-          resolveId(id, importer) {
-            // 入口引入直接替换为虚拟模块
-            if (importer?.endsWith(".html")) {
-              return virtualImporterModuleId;
-            }
-            // 虚拟模块之间的引入
-            if (id in virtualModules) {
-              return id;
-            }
-            // 其他标记为引入external，无需处理
-            if (importer === virtualSourceModuleId) {
-              return { id, external: true, moduleSideEffects: false };
-            }
-            return null;
+          configResolved(config) {
+            // 注入resolveId，保证第一个执行，不会被其他插件阶段
+            /* 虽然vite不建议在这里调整插件，但是没有强行限制
+               1. 避免被其他强行加入的插件提前拦截影响，比如：vite-plugin-uni
+            **/
+            /* @ts-ignore */
+            config.plugins?.unshift({
+              name: "vite-plugin-find-export-dependency-sub",
+              resolveId(id: string, _: string, options: { isEntry: boolean }) {
+                // 入口引入直接替换为虚拟模块
+                if (options.isEntry) {
+                  return virtualImporterModuleId;
+                }
+                // 虚拟模块之间的引入
+                if (id in virtualModules) {
+                  return id;
+                }
+                // 其他标记为引入external，无需处理
+                return {
+                  id,
+                  external: true,
+                  moduleSideEffects: "no-treeshake",
+                };
+              },
+            });
           },
           config(config) {
             // 兼容有分包的逻辑
-            if (Array.isArray(config.build.rollupOptions.output)) {
+            if (Array.isArray(config?.build?.rollupOptions?.output)) {
               config.build.rollupOptions.output.map((item) => {
                 delete item.manualChunks;
               });
             } else {
-              delete config.build.rollupOptions.output.manualChunks;
+              delete config?.build?.rollupOptions?.output?.manualChunks;
             }
           },
           // 虚拟模块加载逻辑
@@ -322,15 +337,15 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
             }
             return null;
           },
-
           generateBundle(_, chunk) {
             Object.values(chunk).forEach((module) => {
               // 处理源码，不处理静态资源
               if (module.type === "chunk") {
-                treeShakingCode = module?.code || "";
                 // 文件类型需要特殊处理，比如vue文件的scopeId每次都会变化，无法进行对比，需要去除
                 if (extToTransformMap.has(ext)) {
                   treeShakingCode = extToTransformMap.get(ext)!(module?.code);
+                } else {
+                  treeShakingCode = module?.code;
                 }
                 // 获取源码的引入路径和对应引入的变量，例如：{ "./a": ["a","b","default"] }
                 sourceToImports = findSourceToImportsFormAst(
@@ -353,13 +368,13 @@ async function getTreeShakingDetail(options: GetTreeShakingDetailOptions) {
           1. 代码中有语法错误
           2. 代码中有导入不存在的模块
         */
+    console.log(e);
     return {
       treeShakingCode: code,
       sourceToImports,
       dynamicallySource,
     };
   }
-
   return {
     treeShakingCode,
     sourceToImports,

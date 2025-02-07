@@ -37,7 +37,7 @@ export class SourceToImportId {
     if (this.isBareImport(source)) {
       return source;
     }
-    // 相对路径需要加上引用地址才能作为唯一id
+    // 相对路径需要加上引用地址才能作为唯一id(以//为分隔符)
     return `${source}//${importer || ""}`;
   }
   // 是否是裸导出

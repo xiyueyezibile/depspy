@@ -30,9 +30,6 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
   return {
     name: "vite-plugin-insight",
     enforce: "pre",
-    config(config) {
-      config.build.write = false;
-    },
     configResolved(config) {
       //  设置入口绝对地址，默认是index.html
       options.entry = options?.entry
@@ -40,18 +37,31 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
         : normalizePath(path.resolve(config.root, "index.html"));
       // 初始化
       globalBundle = new Bundle(options);
-    },
-    resolveId(id, importer) {
-      // 调用下一个 resolveId 钩子获取输出
-      return this.resolve(id, importer, { ...options, skipSelf: true }).then(
-        (output) => {
-          // 保存源码路径和绝对路径的关联
-          if (output?.id) {
-            sourceToImportIdMap.addRecord(id, importer, output?.id);
+      // 注入resolveId，保证第一个执行，不会被其他插件阶段
+      /* 虽然vite不建议在这里调整插件，但是没有强行限制
+         1. 只是收集引入和真实路径的关系，不会影响其他插件运行
+         2. 避免被其他强行加入的插件提前拦截影响，比如：vite-plugin-uni
+      **/
+      /* @ts-ignore */
+      config.plugins?.unshift({
+        name: "vite-plugin-gen-source-import-map",
+        resolveId(id: string, importer: string) {
+          if (process.env[DEP_SPY_SUB_START]) {
+            return;
           }
-          return output;
+          // 调用下一个 resolveId 钩子获取输出
+          return this.resolve(id, importer, {
+            ...options,
+            skipSelf: true,
+          }).then((output: { id: string }) => {
+            // 保存源码路径和绝对路径的关联
+            if (output?.id) {
+              sourceToImportIdMap.addRecord(id, importer, output?.id);
+            }
+            return output;
+          });
         },
-      );
+      });
     },
     load(id) {
       // 收集项目中所有引入的模块信息
