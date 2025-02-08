@@ -69,6 +69,8 @@ class ModuleGraph {
   rootId: string;
   tiledTree: ModuleTree[] = [];
   private _moduleIds = new Map<string, number>();
+  /**文件id+导出名 to 导入文件名列表 */
+  entryIdAndExportToFileNames = new Map<string, Set<string>>();
   constructor(
     bundle: Bundle,
     entryId: string,
@@ -195,11 +197,31 @@ class ModuleGraph {
       });
     }
   }
-  transform(
-    entryId: string = this.entryId,
-    depth: number = 9999,
-    parent: ModuleTree | null = null,
-  ): ModuleTree | null {
+  /** 收集函数粒度更改影响的文件 */
+  collectedEntryAndExportToFileNames(
+    entryId: string,
+    changeExports: string[],
+    path: string[],
+  ) {
+    changeExports.forEach((exportName) => {
+      path.slice(0, -1).forEach((id) => {
+        const fullId = this.rootId + id;
+
+        if (this.entryIdAndExportToFileNames.has(`${entryId}//${exportName}`)) {
+          this.entryIdAndExportToFileNames
+            .get(`${entryId}//${exportName}`)
+            .add(fullId);
+        } else {
+          this.entryIdAndExportToFileNames.set(
+            `${entryId}//${exportName}`,
+            new Set([fullId]),
+          );
+        }
+      });
+    });
+  }
+  /**初始化树节点 */
+  initTreeNodeData(entryId: string, parent: ModuleTree) {
     let id = entryId;
     if (this._moduleIds.has(entryId)) {
       const newValue = this._moduleIds.get(entryId) + 1;
@@ -211,6 +233,7 @@ class ModuleGraph {
     }
     const nameArr = entryId.split("/");
     const exportEffect = this.bundle.allExportEffected.get(entryId);
+
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
       id: id,
@@ -243,6 +266,21 @@ class ModuleGraph {
         };
       }, {}),
     };
+    return tree;
+  }
+  transform(
+    entryId: string = this.entryId,
+    depth: number = 9999,
+    parent: ModuleTree | null = null,
+  ): ModuleTree | null {
+    const tree: ModuleTree = this.initTreeNodeData(entryId, parent);
+    if (tree.changedExports.length > 0) {
+      this.collectedEntryAndExportToFileNames(
+        entryId,
+        tree.changedExports,
+        tree.path,
+      );
+    }
 
     if (!parent) tree.rootId = this.rootId;
 

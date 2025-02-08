@@ -1,4 +1,4 @@
-const SidebarButton = ({ children, onClick=() => {} }) => {
+const SidebarButton = ({ children, onClick = () => {} }) => {
   return (
     <div
       onClick={onClick}

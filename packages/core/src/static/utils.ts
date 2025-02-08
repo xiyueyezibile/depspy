@@ -164,13 +164,16 @@ export function getGitRootPath() {
 }
 
 // 分块逻辑
-export async function sendDataByChunk(data: any[]) {
+export async function sendDataByChunk(data: any[], path: string) {
   const chunkLen = 80;
   // 分块发送数据给服务器
   try {
     await Promise.all(
       new Array(Math.ceil(data?.length / chunkLen)).fill(0).map((_, i) => {
-        return postServerGraph(data.slice(i * chunkLen, (i + 1) * chunkLen));
+        return postServerGraph(
+          data.slice(i * chunkLen, (i + 1) * chunkLen),
+          path,
+        );
       }),
     );
   } catch (error) {
@@ -178,7 +181,7 @@ export async function sendDataByChunk(data: any[]) {
   }
 }
 // 发送数据逻辑
-export function postServerGraph(data: any[]) {
+export function postServerGraph(data: any[], path: string) {
   const options = {
     hostname: "localhost",
     port: 2025,
@@ -190,7 +193,7 @@ export function postServerGraph(data: any[]) {
   };
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
-      let chunks = [];
+      const chunks = [];
       res.on("data", (chunk) => {
         chunks.push(chunk);
       });
