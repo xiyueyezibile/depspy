@@ -37,12 +37,16 @@ export const Selected = () => {
   const SelectNodeCardList = useMemo(() => {
     return selectNodeInfo.map((item) => {
       return (
-        <div className="bg-gray-800 p-4 rounded-lg shadow-md mb-4">
-          <h2 className="text-white text-xl font-bold mb-2">{item.name}</h2>
+        <div className="w-full p-4 rounded-lg shadow-md mb-4">
+          <h2 className="text-[var(--color-primary-text)] text-xl font-bold mb-2">
+            {item.name}
+          </h2>
           <div className="mb-2">
-            <p className="text-gray-400 font-semibold">Removed Exports:</p>
+            <p className="text-[var(--color-text)] font-semibold">
+              Removed Exports:
+            </p>
             {item.removedExports.length && (
-              <ul className="list-disc list-inside text-gray-300">
+              <ul className="list-disc list-inside text-[var(--color-text-description)]">
                 {item.removedExports.map((exportItem, index) => (
                   <li key={index}>{exportItem}</li>
                 ))}
@@ -50,9 +54,11 @@ export const Selected = () => {
             )}
           </div>
           <div>
-            <p className="text-gray-400 font-semibold">Rendered Exports:</p>
+            <p className="text-[var(--color-text)] font-semibold">
+              Rendered Exports:
+            </p>
             {item.renderedExports.length && (
-              <ul className="list-disc list-inside text-gray-300">
+              <ul className="list-disc list-inside text-[var(--color-text-description)]">
                 {item.renderedExports.map((exportItem, index) => (
                   <li key={index}>{exportItem}</li>
                 ))}
@@ -66,7 +72,7 @@ export const Selected = () => {
 
   return (
     <>
-      <div className="bg-bg-layout min-w-90 p-2">{SelectNodeCardList}</div>
+      <div className="bg-bg-layout min-w-90">{SelectNodeCardList}</div>
     </>
   );
 };

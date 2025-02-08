@@ -33,8 +33,8 @@ export const ToggleButton = ({
           border font-semibold
           ${
             checked
-              ? "bg-purple-500 border-purple-500 text-white shadow-lg"
-              : "border-gray-300 text-purple-500 hover:border-purple-300"
+              ? "bg-[var(--control-item-bg-active)]  text-[var(--color-primary-text)] shadow-lg"
+              : " text-[var(--color-primary-text)]"
           }
         `}
       >

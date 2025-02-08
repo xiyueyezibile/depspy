@@ -109,7 +109,8 @@ export const Global = () => {
       </header>
 
       <div className="p-4 font-bold border-b min-w-40">
-        当前数量：<span className="text-blue-500">{totalCount}</span>
+        当前数量：
+        <span className="text-[var(--color-primary-text)]">{totalCount}</span>
       </div>
 
       <div className="flex-1 overflow-auto p-4" onClick={handleFileListClick}>

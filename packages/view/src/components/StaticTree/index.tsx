@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as G6 from "@antv/g6";
-import { useStaticStore } from "@/contexts";
+import { useStaticStore, useStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 import { shallow } from "zustand/shallow";
 
@@ -34,6 +34,12 @@ export default function StaticTree() {
     }),
     shallow,
   );
+  const { theme } = useStore(
+    (state) => ({
+      theme: state.theme,
+    }),
+    shallow,
+  );
   const graphRef = useRef<G6.TreeGraph>();
   const [cloneData, setCloneData] = useState();
   const [circleMap, setCircleMap] = useState(new Map());
@@ -42,6 +48,164 @@ export default function StaticTree() {
   const rootPath = staticRoot.rootId;
 
   // console.log(staticRoot);
+
+  useEffect(() => {
+    // setCloneData(cloneData);
+    if (!graphRef.current) return;
+    const matrix = graphRef.current.getGroup().getMatrix();
+    const zoom = graphRef.current.getZoom();
+    const offsetX = matrix[6] / zoom;
+    const offsetY = matrix[7] / zoom;
+
+    G6RegisterNode();
+    graphRef.current.changeData(cloneData);
+
+    circleMap.forEach((k, v) => {
+      if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+        graphRef.current.addItem("edge", {
+          source: k,
+          target: v,
+          type: "circle-line",
+        });
+      }
+    });
+
+    //保持节点位置不变
+    graphRef.current.translate(offsetX, offsetY);
+    graphRef.current.zoom(zoom);
+    graphRef.current.refresh();
+    clearHighlight();
+    showGitChangedNodes && handleNodeState(gitChangedNodes, State.GIT, true);
+    showImportChangedNodes &&
+      handleNodeState(importChangedNodes, State.IMPORT, true);
+  }, [theme]);
+
+  //注册自定节点和边
+  function G6RegisterNode() {
+    // 注册module节点
+    G6.registerNode(
+      "tree-node",
+      {
+        drawShape: function drawShape(cfg, group) {
+          const rect = group.addShape("rect", {
+            attrs: {
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 20,
+              fill: "transparent", // 添加透明填充色确保点击区域覆盖整个矩形
+              stroke: theme === "dark" ? "#260a84" : "#a992f6",
+              radius: 5,
+            },
+            // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
+            name: "rect-shape",
+          });
+          const content = textOverflow(cfg.name, 100);
+          const text = group.addShape("text", {
+            attrs: {
+              text: content,
+              fill: theme === "dark" ? "#ffffffd9" : "#000000e0",
+            },
+            // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
+            name: "text-shape",
+          });
+          const tbox = text.getBBox();
+          const rbox = rect.getBBox();
+          const hasChildren =
+            Array.isArray(cfg.children) && cfg.children.length > 0;
+          text.attr({
+            x: (rbox.width - tbox.width) / 2,
+            y: (rbox.height + tbox.height) / 2,
+          });
+          if (hasChildren) {
+            group.addShape("marker", {
+              attrs: {
+                x: rbox.width + 8,
+                y: 0,
+                r: 6,
+                symbol: cfg.collapsed ? G6.Marker.expand : G6.Marker.collapse,
+                stroke: theme === "dark" ? "#260a84" : "#a992f6",
+                lineWidth: 1,
+              },
+              // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
+              name: "collapse-icon",
+            });
+          }
+          return rect;
+        },
+        update: (cfg, item) => {
+          const group = item.getContainer();
+          const icon = group.find((e) => e.get("name") === "collapse-icon");
+          icon?.attr(
+            "symbol",
+            cfg.collapsed ? G6.Marker.expand : G6.Marker.collapse,
+          );
+        },
+      },
+      "single-node",
+    );
+    // 注册线节点
+    G6.registerEdge("custom-polyline", {
+      draw(cfg, group) {
+        const startPoint = cfg.startPoint;
+        const endPoint = cfg.endPoint;
+
+        let strokeColor = theme === "dark" ? "#260a84" : "#a992f6";
+        const edge = group.get("item");
+        if (edge.hasState(State.HIGHLIGHTE)) {
+          strokeColor = theme === "dark" ? "#FFC107" : "#FFF3CD";
+        } else if (edge.hasState(State.GIT)) {
+          strokeColor = theme === "dark" ? "#00BCD4" : "#E0F7FA";
+        } else if (edge.hasState(State.IMPORT)) {
+          strokeColor = theme === "dark" ? "#28A745" : "#D4EDDA";
+        }
+        const shape = group.addShape("path", {
+          attrs: {
+            stroke: strokeColor,
+            path: [
+              ["M", startPoint.x, startPoint.y],
+              ["L", endPoint.x / 3 + (2 / 3) * startPoint.x, startPoint.y], // 三分之一处
+              ["L", endPoint.x / 3 + (2 / 3) * startPoint.x, endPoint.y], // 三分之二处
+              ["L", endPoint.x, endPoint.y],
+            ],
+            endArrow: true,
+          },
+          // 在 G6 3.3 及之后的版本中，必须指定 name，可以是任意字符串，但需要在同一个自定义元素类型中保持唯一性
+          name: "custom-polyline-path",
+        });
+        return shape;
+      },
+    });
+    // 注册循环线节点
+    G6.registerEdge("circle-line", {
+      draw(cfg, group) {
+        const { startPoint, endPoint } = cfg;
+
+        let strokeColor = theme === "dark" ? "#8f71f3" : "#3a0fc6";
+        const edge = group.get("item");
+        if (edge.hasState(State.HIGHLIGHTE)) {
+          strokeColor = theme === "dark" ? "#FFC107" : "#FFF3CD";
+        } else if (edge.hasState(State.GIT)) {
+          strokeColor = theme === "dark" ? "#00BCD4" : "#E0F7FA";
+        } else if (edge.hasState(State.IMPORT)) {
+          strokeColor = theme === "dark" ? "#28A745" : "#D4EDDA";
+        }
+        const shape = group.addShape("line", {
+          attrs: {
+            x1: startPoint.x,
+            y1: startPoint.y,
+            x2: endPoint.x,
+            y2: endPoint.y,
+            stroke: strokeColor,
+            lineWidth: 2, // 线宽
+            // endArrow: true,
+          },
+          name: "circle-line-path",
+        });
+        return shape;
+      },
+    });
+  }
 
   useEffect(() => {
     //清除所有item的高亮状态
@@ -163,27 +327,16 @@ export default function StaticTree() {
       },
       nodeStateStyles: {
         highlight: {
-          stroke: "yellow",
+          stroke: theme === "dark" ? "#FFC107" : "#FFF3CD",
           lineWidth: 2,
         },
         gitChanged: {
-          stroke: "green",
+          stroke: theme === "dark" ? "#00BCD4" : "#E0F7FA",
           lineWidth: 2,
         },
         importChanged: {
-          stroke: "blue",
+          stroke: theme === "dark" ? "#28A745" : "#D4EDDA",
           lineWidth: 2,
-        },
-      },
-      edgeStateStyles: {
-        highlight: {
-          stroke: "yellow",
-        },
-        gitChanged: {
-          stroke: "green",
-        },
-        importChanged: {
-          stroke: "blue",
         },
       },
       defaultNode: {
@@ -432,130 +585,3 @@ const throttle = (func, delay) => {
     }
   };
 };
-
-//注册自定节点和边
-function G6RegisterNode() {
-  // 注册module节点
-  G6.registerNode(
-    "tree-node",
-    {
-      drawShape: function drawShape(cfg, group) {
-        const rect = group.addShape("rect", {
-          attrs: {
-            x: 0,
-            y: 0,
-            width: 100,
-            height: 20,
-            fill: "transparent", // 添加透明填充色确保点击区域覆盖整个矩形
-            stroke: "rgb(167,167,167)",
-            radius: 5,
-          },
-          // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
-          name: "rect-shape",
-        });
-        const content = textOverflow(cfg.name, 100);
-        const text = group.addShape("text", {
-          attrs: {
-            text: content,
-            fill: "white",
-          },
-          // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
-          name: "text-shape",
-        });
-        const tbox = text.getBBox();
-        const rbox = rect.getBBox();
-        const hasChildren =
-          Array.isArray(cfg.children) && cfg.children.length > 0;
-        text.attr({
-          x: (rbox.width - tbox.width) / 2,
-          y: (rbox.height + tbox.height) / 2,
-        });
-        if (hasChildren) {
-          group.addShape("marker", {
-            attrs: {
-              x: rbox.width + 8,
-              y: 0,
-              r: 6,
-              symbol: cfg.collapsed ? G6.Marker.expand : G6.Marker.collapse,
-              stroke: "rgb(167,167,167)",
-              lineWidth: 1,
-            },
-            // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
-            name: "collapse-icon",
-          });
-        }
-        return rect;
-      },
-      update: (cfg, item) => {
-        const group = item.getContainer();
-        const icon = group.find((e) => e.get("name") === "collapse-icon");
-        icon?.attr(
-          "symbol",
-          cfg.collapsed ? G6.Marker.expand : G6.Marker.collapse,
-        );
-      },
-    },
-    "single-node",
-  );
-  // 注册线节点
-  G6.registerEdge("custom-polyline", {
-    draw(cfg, group) {
-      const startPoint = cfg.startPoint;
-      const endPoint = cfg.endPoint;
-
-      let strokeColor = "rgb(167,167,167)";
-      const edge = group.get("item");
-      if (edge.hasState(State.HIGHLIGHTE)) {
-        strokeColor = "yellow";
-      } else if (edge.hasState(State.GIT)) {
-        strokeColor = "green";
-      } else if (edge.hasState(State.IMPORT)) {
-        strokeColor = "blue";
-      }
-      const shape = group.addShape("path", {
-        attrs: {
-          stroke: strokeColor,
-          path: [
-            ["M", startPoint.x, startPoint.y],
-            ["L", endPoint.x / 3 + (2 / 3) * startPoint.x, startPoint.y], // 三分之一处
-            ["L", endPoint.x / 3 + (2 / 3) * startPoint.x, endPoint.y], // 三分之二处
-            ["L", endPoint.x, endPoint.y],
-          ],
-          endArrow: true,
-        },
-        // 在 G6 3.3 及之后的版本中，必须指定 name，可以是任意字符串，但需要在同一个自定义元素类型中保持唯一性
-        name: "custom-polyline-path",
-      });
-      return shape;
-    },
-  });
-  // 注册循环线节点
-  G6.registerEdge("circle-line", {
-    draw(cfg, group) {
-      const { startPoint, endPoint } = cfg;
-
-      let strokeColor = "red";
-      const edge = group.get("item");
-      if (edge.hasState(State.HIGHLIGHTE)) {
-        strokeColor = "yellow";
-      } else if (edge.hasState(State.GIT)) {
-        strokeColor = "green";
-      } else if (edge.hasState(State.IMPORT)) {
-        strokeColor = "blue";
-      }
-      const shape = group.addShape("line", {
-        attrs: {
-          x1: startPoint.x,
-          y1: startPoint.y,
-          x2: endPoint.x,
-          y2: endPoint.y,
-          stroke: strokeColor,
-          lineWidth: 2, // 线宽
-          // endArrow: true,
-        },
-        name: "circle-line-path",
-      });
-      return shape;
-    },
-  });
-}
