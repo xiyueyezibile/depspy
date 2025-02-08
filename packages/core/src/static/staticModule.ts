@@ -1,8 +1,6 @@
-import { jsonsToBuffer } from "@dep-spy/utils";
-import http from "http";
 import { ExportEffectedNode } from "./getAllExportEffected";
 import { getGitRootPath } from "./utils";
-import { PluginConfig } from "./vitePluginInsight";
+import { GetModuleInfo, ModuleInfo } from "rollup";
 
 export const externals = ["node_modules"];
 
@@ -11,11 +9,6 @@ export function idInExternals(id: string) {
     return id.includes(external);
   });
 }
-
-// function logCircleModules(circleModules: Module[]) {
-//   const str = circleModules.map((module) => module.id).join(" -> ");
-//   console.log(`Circular dependency detected: ${str}`);
-// }
 
 interface ModuleTree {
   children?: ModuleTree[];
@@ -61,6 +54,7 @@ class Module {
   }
 }
 
+// 构建模块依赖以及相关信息
 class ModuleGraph {
   graph = new Map<string, Module>();
   /** key的导入者value */
@@ -75,12 +69,20 @@ class ModuleGraph {
   rootId: string;
   tiledTree: ModuleTree[] = [];
   private _moduleIds = new Map<string, number>();
-  constructor(bundle: Bundle, map: Record<string, any>) {
+  constructor(
+    bundle: Bundle,
+    entryId: string,
+    allModules: Map<string, ModuleInfo | null>,
+  ) {
     this.bundle = bundle;
     this.rootId = getGitRootPath();
-    // 绝对路径=>模块节点的映射（现在还是空壳）
-    Object.entries(map).forEach(([key]) => {
-      this.graph.set(key, new Module(key));
+    this.entryId = entryId;
+    allModules.forEach((info, id) => {
+      this.graph.set(id, new Module(id));
+      this.importers.set(id, info.importers);
+      this.importedIds.set(id, info.importedIds);
+      this.dynamicImporters.set(id, info.dynamicImporters);
+      this.dynamicallyImportedIds.set(info.id, info.dynamicallyImportedIds);
     });
   }
   /** 是否有重复模块 */
@@ -296,37 +298,11 @@ class ModuleGraph {
     return "";
   }
 }
-
-export function postServerGraph(data: ModuleTree[]) {
-  const options = {
-    hostname: "localhost",
-    port: 2025,
-    path: "/collectBundle",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/octet-stream",
-    },
-  };
-  return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
-      let chunks = [];
-      res.on("data", (chunk) => {
-        chunks.push(chunk);
-      });
-      res.on("end", () => {
-        resolve(Buffer.concat(chunks).toString());
-      });
-    });
-
-    req.on("error", (error) => {
-      reject(error);
-    });
-    req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
-    req.end();
-  });
-}
-
+// 整合vite的打包后的整体信息
 export class Bundle {
+  /** 项目入口 */
+  entry: string;
+  /** 模块图 */
   moduleGraph: ModuleGraph;
   /** 实际打包模块 */
   originModules = new Map<
@@ -336,45 +312,49 @@ export class Bundle {
       renderedExports: string[];
     }
   >();
-  /** 加载模块 */
-  loadModules = new Map<string, any>();
-  noBundleModules = new Map<string, any>();
+  /** 该项目所有的importId */
+  allModules = new Map<string, ModuleInfo | null>();
 
-  options: PluginConfig;
+  // options: PluginConfig;
   allExportEffected: Map<string, ExportEffectedNode>;
 
-  constructor(options: PluginConfig) {
-    this.options = options;
+  constructor(entry: string) {
+    this.entry = entry;
   }
 
   /** 获取实际被打包的模块 */
   resolveOriginModuleByBundle(fn: (originModules: Map<string, any>) => void) {
     fn(this.originModules);
   }
-  /** 获取编译阶段模块 */
-  resolveLoadModule(id: string) {
-    if (!idInExternals(id)) {
-      this.loadModules.set(id, id);
-    }
+  /** 从项目入口收集项目的全部的importId */
+  generateModuleGraph(getModuleInfo: GetModuleInfo) {
+    const allModules = this.collectAllModules(this.entry, getModuleInfo);
+    this.moduleGraph = new ModuleGraph(this, this.entry, allModules);
+    return this.moduleGraph;
   }
-  /** 寻找在编译模块和实际模块都存在的模块 */
-  findLoadModuleWithOriginModule() {
-    const result = {};
-
-    this.loadModules.forEach((module, id) => {
-      if (this.originModules.has(id)) {
-        result[id] = this.originModules.get(id);
-      } else {
-        this.noBundleModules.set(id, module);
+  // 搜集项目所有的引入模块的信息，包括动态引入
+  private collectAllModules(importId: string, getModuleInfo: GetModuleInfo) {
+    const info = getModuleInfo(importId);
+    this.allModules.set(importId, info);
+    [
+      ...(info?.importedIds || []),
+      ...(info?.dynamicallyImportedIds || []),
+    ].forEach((id) => {
+      /*
+        1. 以allExportEffected为准
+        2. 排出三方包
+        3. 排除已经搜集过的importId的
+      */
+      if (
+        !this.allExportEffected.has(id) ||
+        idInExternals(id) ||
+        this.allModules.has(id)
+      ) {
+        return;
       }
+      // 递归搜集子importId
+      this.collectAllModules(id, getModuleInfo);
     });
-
-    return {
-      modules: result,
-    };
-  }
-  /** 根据map生产moduleGraph */
-  newModuleByMap(map: Record<string, any>) {
-    this.moduleGraph = new ModuleGraph(this, map.modules);
+    return this.allModules;
   }
 }

@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { simple } from "acorn-walk";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
+import { jsonsToBuffer } from "@dep-spy/utils";
+import http from "http";
 
 // 源码路径和绝对路径的互相映射
 export class SourceToImportId {
@@ -159,4 +161,48 @@ export function getGitRootPath() {
   } catch {
     return process.cwd();
   }
+}
+
+// 分块逻辑
+export async function sendDataByChunk(data: any[]) {
+  const chunkLen = 80;
+  // 分块发送数据给服务器
+  try {
+    await Promise.all(
+      new Array(Math.ceil(data?.length / chunkLen)).fill(0).map((_, i) => {
+        return postServerGraph(data.slice(i * chunkLen, (i + 1) * chunkLen));
+      }),
+    );
+  } catch (error) {
+    console.log("数据发送失败:", error);
+  }
+}
+// 发送数据逻辑
+export function postServerGraph(data: any[]) {
+  const options = {
+    hostname: "localhost",
+    port: 2025,
+    path: "/collectBundle",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+  };
+  return new Promise((resolve, reject) => {
+    const req = http.request(options, (res) => {
+      let chunks = [];
+      res.on("data", (chunk) => {
+        chunks.push(chunk);
+      });
+      res.on("end", () => {
+        resolve(Buffer.concat(chunks).toString());
+      });
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+    req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
+    req.end();
+  });
 }

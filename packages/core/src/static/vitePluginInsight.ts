@@ -1,12 +1,13 @@
 import path from "path";
-import { SourceToImportId } from "./utils";
-import { Bundle, idInExternals, postServerGraph } from "./staticModule";
+import { sendDataByChunk, SourceToImportId } from "./utils";
+import { Bundle, idInExternals } from "./staticModule";
 import { normalizePath, type PluginOption } from "vite";
 import getAllExportEffected, {
   ExportEffectedNode,
 } from "./getAllExportEffected";
 import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
 import { writeFileSync } from "fs";
+import { GetModuleInfo } from "rollup";
 
 export interface PluginConfig {
   entry?: string;
@@ -14,16 +15,16 @@ export interface PluginConfig {
 }
 export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
   //只能通过ds命令运行;
-  if (!process.env[DEP_SPY_START]) {
-    return false;
-  }
+  // if (!process.env[DEP_SPY_START]) {
+  //   return false;
+  // }
   // 避免子模块运行导致多次运行
   if (process.env[DEP_SPY_SUB_START]) {
     return false;
   }
-
-  /** 收集vite打包后的相关信息 */
+  // 收集项目整体打包信息
   let globalBundle: Bundle;
+
   // 源码路径和绝对路径的互相映射
   const sourceToImportIdMap = new SourceToImportId();
 
@@ -39,7 +40,7 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
         ? normalizePath(options.entry)
         : normalizePath(path.join(config.root, "index.html"));
       // 初始化
-      globalBundle = new Bundle(options);
+      globalBundle = new Bundle(options.entry);
       // 注入resolveId，保证第一个执行，不会被其他插件阶段
       /* 虽然vite不建议在这里调整插件，但是没有强行限制
          1. 只是收集引入和真实路径的关系，不会影响其他插件运行
@@ -63,10 +64,6 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
         },
       });
     },
-    load(id) {
-      // 收集项目中所有引入的模块信息
-      globalBundle.resolveLoadModule(id);
-    },
     async generateBundle(_, bundle) {
       // 避免子模块运行打包导致多次运行
       if (process.env[DEP_SPY_SUB_START]) {
@@ -84,7 +81,7 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
       //   console.log(key, value, "\n");
       // });
       globalBundle.allExportEffected = allExportEffected;
-      // 根据bundle获取实际被打包的模块
+      // 记录bundle获取实际被打包的模块以及真实导出和被treeshaking的导出
       globalBundle.resolveOriginModuleByBundle((originModules) => {
         // 产物列表（包含静态资源和代码模块）
         const distLists = Object.values(bundle);
@@ -107,52 +104,21 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
           }
         });
       });
-      // 寻找在load阶段和打包阶段都存在的模块（去除了treeShaking的模块）
-      const actualMap = globalBundle.findLoadModuleWithOriginModule();
-      // 挂载生成依赖树的类（只是壳子）
-      globalBundle.newModuleByMap(actualMap);
-      // 拿到moduleGraph （设置生成依赖树需要的数据）
-      const moduleGraph = globalBundle.moduleGraph;
-      moduleGraph.entryId = options.entry;
-      // 获取所所有导入导出关系 （设置生成依赖树需要的数据）
-      Object.keys(actualMap.modules).forEach((id) => {
-        const info = this.getModuleInfo(id);
-        if (info) {
-          moduleGraph.importers.set(info.id, info.importers);
-          moduleGraph.importedIds.set(info.id, info.importedIds);
-          moduleGraph.dynamicImporters.set(info.id, info.dynamicImporters);
-          moduleGraph.dynamicallyImportedIds.set(
-            info.id,
-            info.dynamicallyImportedIds,
-          );
-        }
-      });
-
+      // 生成生成依赖树
+      const moduleGraph = globalBundle.generateModuleGraph(
+        this.getModuleInfo as unknown as GetModuleInfo,
+      );
       /** 根据导入导出关系构建模块依赖图（根据上述设置的信息进行构建） */
       moduleGraph.buildGraph();
       /** 分析并标记循环依赖 */
       moduleGraph.analysisCircleModule(options.entry);
       /** 生成铺平的树 */
-      const flatTree = moduleGraph.generateTiledTreeByRootId(options.entry);
-      // 默认分块长度
-      const chunkLen = 80;
+      const flatTree = moduleGraph.generateTiledTreeByRootId();
       // 分块发送数据给服务器
-      try {
-        await Promise.all(
-          new Array(Math.ceil(flatTree?.length / chunkLen))
-            .fill(0)
-            .map((_, i) => {
-              return postServerGraph(
-                flatTree.slice(i * chunkLen, (i + 1) * chunkLen),
-              );
-            }),
-        );
-      } catch (error) {
-        console.log("数据发送失败:", error);
-      }
+      await sendDataByChunk(flatTree);
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(process.cwd(), jsonName);
-      writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId(options.entry));
+      writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
       // console.log("moduleTree.json文件已生成", flatTree, options.entry);
     },
   };
