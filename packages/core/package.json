@@ -8,10 +8,10 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./vite-plugin-insight": {
-      "import": "./dist/static/vitePluginInsight.mjs",
-      "require": "./dist/static/vitePluginInsight.js",
-      "types": "./dist/static/vitePluginInsight.d.ts"
+    "./vite-plugin-dep-spy": {
+      "import": "./dist/static/vitePluginDepSpy.mjs",
+      "require": "./dist/static/vitePluginDepSpy.js",
+      "types": "./dist/static/vitePluginDepSpy.d.ts"
     }
   },
   "private": false,

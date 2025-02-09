@@ -13,11 +13,11 @@ export interface PluginConfig {
   entry?: string;
   buildCommand?: string;
 }
-export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
+export function vitePluginDepSpy(options: PluginConfig = {}): PluginOption {
   //只能通过ds命令运行;
-  // if (!process.env[DEP_SPY_START]) {
-  //   return false;
-  // }
+  if (!process.env[DEP_SPY_START]) {
+    return false;
+  }
   // 避免子模块运行导致多次运行
   if (process.env[DEP_SPY_SUB_START]) {
     return false;
@@ -29,7 +29,7 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
   const sourceToImportIdMap = new SourceToImportId();
 
   return {
-    name: "vite-plugin-insight",
+    name: "vite-plugin-dep-spy",
     enforce: "pre",
     configResolved(config) {
       if (process.env[DEP_SPY_SUB_START]) {
@@ -48,7 +48,7 @@ export function vitePluginInsight(options: PluginConfig = {}): PluginOption {
       **/
       /* @ts-ignore */
       config.plugins?.unshift({
-        name: "vite-plugin-gen-source-import-map",
+        name: "vite-plugin-dep-spy-main-resolve",
         resolveId(id: string, importer: string) {
           // 调用下一个 resolveId 钩子获取输出
           return this.resolve(id, importer, {

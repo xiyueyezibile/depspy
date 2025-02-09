@@ -54,7 +54,7 @@ export class SourceToImportId {
 // 规范化vite插件中的id
 export function normalizeIdToFilePath(id: string) {
   const pathWithoutQuery = id.split("?")[0];
-  return path.normalize(pathWithoutQuery);
+  return path.normalize(pathWithoutQuery).replace(/\x00/g, "");
 }
 
 // 通过字符串获取hash值
@@ -109,10 +109,9 @@ export function getFileContentAtCommit(
   absolutePath: string,
   commitHash: string,
 ) {
+  absolutePath = normalizeIdToFilePath(absolutePath);
   try {
-    const gitRootPath = execSync("git rev-parse --show-toplevel")
-      .toString()
-      .trim();
+    const gitRootPath = getGitRootPath();
     // 构建 Git 命令
     const command = `git show ${commitHash}:${path.relative(
       gitRootPath,
@@ -127,14 +126,20 @@ export function getFileContentAtCommit(
   }
 }
 
+// 通过vite的id规范判读一个文件路径是不是commonjs规范
+export function isCommonJsById(importId: string) {
+  const query = importId.split("?");
+  return query.includes("commonjs-exports");
+}
+
 // 通过vite的id安全的获取当前真实文件源码
 export function readFileSyncSafe(id: string) {
   const filePath = normalizeIdToFilePath(id);
   let code = "";
   try {
     code = readFileSync(filePath, { encoding: "utf-8" });
-  } catch {
-    console.error(id, "对应id不存在");
+  } catch (e) {
+    console.error(`路径:${filePath}读取失败`, e);
   }
   return code;
 }
@@ -208,4 +213,22 @@ export function postServerGraph(data: any[], path: string) {
     req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
     req.end();
   });
+}
+
+// 缓存高消耗的函数结果
+export function cacheReturn<T extends (...args: any) => any>(
+  callback: T,
+  createKey: (...args: Parameters<T>) => string,
+) {
+  const cache = new Map();
+  async function fn(...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> {
+    const key = createKey(...args);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    const value = callback.apply(callback, args);
+    cache.set(key, value);
+    return value;
+  }
+  return fn;
 }

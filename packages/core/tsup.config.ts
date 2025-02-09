@@ -4,7 +4,7 @@ export default defineConfig({
   entry: [
     "src/index.ts",
     "src/threadsPool/worker.ts",
-    "src/static/vitePluginInsight.ts",
+    "src/static/vitePluginDepSpy.ts",
   ],
   publicDir: "public",
   external: ["vite", "rollup"],

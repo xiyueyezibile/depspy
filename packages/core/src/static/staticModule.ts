@@ -81,10 +81,13 @@ class ModuleGraph {
     this.entryId = entryId;
     allModules.forEach((info, id) => {
       this.graph.set(id, new Module(id));
-      this.importers.set(id, info.importers);
-      this.importedIds.set(id, info.importedIds);
-      this.dynamicImporters.set(id, info.dynamicImporters);
-      this.dynamicallyImportedIds.set(info.id, info.dynamicallyImportedIds);
+      this.importers.set(id, info?.importers || []);
+      this.importedIds.set(id, info?.importedIds || []);
+      this.dynamicImporters.set(id, info?.dynamicImporters || []);
+      this.dynamicallyImportedIds.set(
+        info?.id,
+        info?.dynamicallyImportedIds || [],
+      );
     });
   }
   /** 是否有重复模块 */
