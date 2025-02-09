@@ -190,7 +190,7 @@ export function postServerGraph(data: any[], path: string) {
   const options = {
     hostname: "localhost",
     port: 2025,
-    path: "/collectBundle",
+    path,
     method: "POST",
     headers: {
       "Content-Type": "application/octet-stream",
