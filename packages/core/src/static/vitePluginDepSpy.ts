@@ -9,11 +9,15 @@ import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
 import { writeFileSync } from "fs";
 import { GetModuleInfo } from "rollup";
 
-export interface PluginConfig {
+export interface VitePluginDepSpyConfig {
+  // 项目的入口，默认为index.html
   entry?: string;
-  buildCommand?: string;
+  // 忽略的文件路径，正则用test，字符串用includes
+  ignores?: (string | RegExp)[];
 }
-export function vitePluginDepSpy(options: PluginConfig = {}): PluginOption {
+export function vitePluginDepSpy(
+  options: VitePluginDepSpyConfig = {},
+): PluginOption {
   //只能通过ds命令运行;
   if (!process.env[DEP_SPY_START]) {
     return false;
@@ -71,12 +75,7 @@ export function vitePluginDepSpy(options: PluginConfig = {}): PluginOption {
       }
       // 绝对路径=>受到影响的导出 之间的映射
       const allExportEffected: Map<string, ExportEffectedNode> =
-        await getAllExportEffected.call(
-          this,
-          options.entry,
-          new Set([options.entry]),
-          sourceToImportIdMap,
-        );
+        await getAllExportEffected.call(this, options, sourceToImportIdMap);
       // allExportEffected.forEach((key, value) => {
       //   console.log(key, value, "\n");
       // });
@@ -114,24 +113,22 @@ export function vitePluginDepSpy(options: PluginConfig = {}): PluginOption {
       moduleGraph.analysisCircleModule(options.entry);
       /** 生成铺平的树 */
       const flatTree = moduleGraph.generateTiledTreeByRootId();
-      const entryIdAndExportToFileNames = Array.from(
-        moduleGraph.entryIdAndExportToFileNames.entries() || [],
-      ).map(([key, value]) => {
-        return {
-          [key]: Array.from(value),
-        };
-      });
-      console.log(entryIdAndExportToFileNames, "你");
+      // const entryIdAndExportToFileNames = Array.from(
+      //   moduleGraph.entryIdAndExportToFileNames.entries() || [],
+      // ).map(([key, value]) => {
+      //   return {
+      //     [key]: Array.from(value),
+      //   };
+      // });
       // 分块发送数据给服务器
       await sendDataByChunk(flatTree, "/collectBundle");
-      await sendDataByChunk(
-        entryIdAndExportToFileNames,
-        "/collectEntryIdAndExportToFileNames",
-      );
+      // await sendDataByChunk(
+      //   entryIdAndExportToFileNames,
+      //   "/collectEntryIdAndExportToFileNames",
+      // );
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(process.cwd(), jsonName);
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
-      // console.log("moduleTree.json文件已生成", flatTree, options.entry);
     },
   };
 }

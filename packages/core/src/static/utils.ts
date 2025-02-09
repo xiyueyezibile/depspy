@@ -232,3 +232,20 @@ export function cacheReturn<T extends (...args: any) => any>(
   }
   return fn;
 }
+
+// 判断文件是否需要过滤
+export function isPathNeedFilter(
+  path: string,
+  ignores: (string | RegExp)[] = [],
+) {
+  // 遍历正则表达式数组
+  return ignores.some((reg) => {
+    if (reg instanceof RegExp) {
+      return reg.test(path);
+    }
+    if (typeof reg === "string") {
+      return path.includes(reg);
+    }
+    return true;
+  });
+}

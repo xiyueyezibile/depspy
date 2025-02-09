@@ -8,9 +8,11 @@ import {
   normalizeIdToFilePath,
   readFileSyncSafe,
   SourceToImportId,
+  isPathNeedFilter,
 } from "./utils";
 import { PluginContext } from "rollup";
 import { getTreeShakingDetail as _getTreeShakingDetail } from "./getTreeShakingDetail";
+import { VitePluginDepSpyConfig } from "./vitePluginDepSpy";
 
 // 只处理包含JS逻辑的文件类型
 const targetExt = new Set<string>([
@@ -49,13 +51,33 @@ const getTreeShakingDetail = cacheReturn(_getTreeShakingDetail, (options) => {
     Object.values(options).reduce((pre, cur) => pre + cur, ""),
   );
 });
-
-// 获取代码中有哪些导出收到了改动的影响（直接或间接）
+// getAllExportEffect的包装层，避免外层因为本身的递归参数传入不必要的参数
 export default async function getAllExportEffect(
   // 必须在vite的hook上下文中调用
   this: PluginContext,
   // 入口绝对地址
+  options: VitePluginDepSpyConfig,
+  // 源码引入到绝对路径的映射
+  sourceToImportIdMap: SourceToImportId,
+) {
+  const { entry, ignores = [] } = options;
+  return await _getAllExportEffect.call(
+    this,
+    entry,
+    ignores,
+    new Set([options.entry]),
+    sourceToImportIdMap,
+  );
+}
+
+// 获取代码中有哪些导出收到了改动的影响（直接或间接）
+async function _getAllExportEffect(
+  // 必须在vite的hook上下文中调用
+  this: PluginContext,
+  // 入口绝对地址
   entry: string,
+  // 忽略的文件
+  ignores: VitePluginDepSpyConfig["ignores"],
   // 当前节点经过的树路径
   paths: Set<string>,
   // 源码引入到绝对路径的映射
@@ -72,8 +94,20 @@ export default async function getAllExportEffect(
   const ext = path.extname(normalizeIdToFilePath(entry));
   // 是否是commonjs规范的文件
   const isCommonJs = isCommonJsById(entry);
-  // 如果是node_modules下的文件或者不是JS类型的源码，直接返回
-  if (!targetExt.has(ext) || entry.includes("node_modules")) {
+
+  /* 返回空节点，只做展示
+    1. 用户配置的忽略文件
+    2. 不是JS类型的源码，直接返回
+    3. 是commonjs规范的文件
+    4. 如果是node_modules下的文件 
+  */
+  if (
+    isPathNeedFilter(entry, ignores) ||
+    !targetExt.has(ext) ||
+    isCommonJs ||
+    entry.includes("node_modules")
+  ) {
+    // 构造空节点
     const exportEffect: ExportEffectedNode = {
       exportEffectedNames: new Set(),
       importEffectedNames: new Map(),
@@ -82,6 +116,7 @@ export default async function getAllExportEffect(
     paths.delete(entry);
     return importIdToExportEffected;
   }
+  // 利用vite插件上下文的方法获取当前文件的信息
   const currentInfo = this.getModuleInfo(entry);
   // 保证该文件的import的影响已经计算完成
   const importDepPromise: Promise<Map<string, Set<string>>>[] = [];
@@ -100,9 +135,10 @@ export default async function getAllExportEffect(
       importDepPromise.push(importIdToExportEffectedPromise.get(importedId));
       return;
     }
-    const promise = getAllExportEffect.call(
+    const promise = _getAllExportEffect.call(
       this,
       importedId,
+      ignores,
       new Set([...paths, importedId]),
       sourceToImportIdMap,
     );
