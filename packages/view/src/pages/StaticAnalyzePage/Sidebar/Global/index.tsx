@@ -80,7 +80,7 @@ export const Global = () => {
   }, [importMap]);
 
   const totalCount = useMemo(() => {
-    return activeTab === "git" ? gitChangedNodes.size : importChangedNodes.size;
+    return activeTab === "git" ? gitMap.size : importMap.size;
   }, [activeTab, gitMap.size, importMap.size]);
 
   const handleFileListClick = useCallback(

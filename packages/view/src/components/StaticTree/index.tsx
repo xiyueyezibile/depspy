@@ -10,6 +10,21 @@ const State = Object.freeze({
   IMPORT: "importChanged",
 });
 
+const COLOR = Object.freeze({
+  DARK: {
+    SIMPLE: "rgb(167,167,167)",
+    HIGHLIGHT: "#FFC107",
+    GIT: "#00BCD4",
+    IMPORT: "#BC00D4",
+  },
+  LIGHT: {
+    SIMPLE: "#a992f6",
+    HIGHLIGHT: "#000",
+    GIT: "#878300",
+    IMPORT: "#008387",
+  },
+});
+
 export default function StaticTree() {
   const {
     staticRoot,
@@ -46,6 +61,10 @@ export default function StaticTree() {
   const highlightedNodeIdsRef = useRef(highlightedNodeIds);
   const containerRef = useRef<HTMLDivElement>();
   const rootPath = staticRoot.rootId;
+  const showGitChangedNodesRef = useRef(showGitChangedNodes);
+  const showImportChangedNodesRef = useRef(showImportChangedNodes);
+  const gitChangedNodesRef = useRef(gitChangedNodes);
+  const importChangedNodesRef = useRef(importChangedNodes);
 
   // console.log(staticRoot);
 
@@ -58,6 +77,34 @@ export default function StaticTree() {
     const offsetY = matrix[7] / zoom;
 
     G6RegisterNode();
+    // 生成新的nodeStateStyles配置
+    const newNodeStateStyles = {
+      highlight: {
+        stroke: theme === "dark" ? COLOR.DARK.HIGHLIGHT : COLOR.LIGHT.HIGHLIGHT,
+        lineWidth: 2,
+      },
+      gitChanged: {
+        stroke: theme === "dark" ? COLOR.DARK.GIT : COLOR.LIGHT.GIT,
+        lineWidth: 2,
+      },
+      importChanged: {
+        stroke: theme === "dark" ? COLOR.DARK.IMPORT : COLOR.LIGHT.IMPORT,
+        lineWidth: 2,
+      },
+    };
+
+    // 更新图的nodeStateStyles配置
+    graphRef.current.set("nodeStateStyles", newNodeStateStyles);
+
+    // 遍历所有节点，重新应用当前状态以更新样式
+    graphRef.current.getNodes().forEach((node) => {
+      const states = node.getStates();
+      states.forEach((state) => {
+        // 先取消状态，再重新激活以应用新样式
+        graphRef.current.setItemState(node, state, false);
+        graphRef.current.setItemState(node, state, true);
+      });
+    });
     graphRef.current.changeData(cloneData);
 
     circleMap.forEach((k, v) => {
@@ -94,7 +141,7 @@ export default function StaticTree() {
               width: 100,
               height: 20,
               fill: "transparent", // 添加透明填充色确保点击区域覆盖整个矩形
-              stroke: theme === "dark" ? "#260a84" : "#a992f6",
+              stroke: theme === "dark" ? COLOR.DARK.SIMPLE : COLOR.LIGHT.SIMPLE,
               radius: 5,
             },
             // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
@@ -124,7 +171,8 @@ export default function StaticTree() {
                 y: 0,
                 r: 6,
                 symbol: cfg.collapsed ? G6.Marker.expand : G6.Marker.collapse,
-                stroke: theme === "dark" ? "#260a84" : "#a992f6",
+                stroke:
+                  theme === "dark" ? COLOR.DARK.SIMPLE : COLOR.LIGHT.SIMPLE,
                 lineWidth: 1,
               },
               // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
@@ -150,14 +198,17 @@ export default function StaticTree() {
         const startPoint = cfg.startPoint;
         const endPoint = cfg.endPoint;
 
-        let strokeColor = theme === "dark" ? "#260a84" : "#a992f6";
+        let strokeColor =
+          theme === "dark" ? COLOR.DARK.SIMPLE : COLOR.LIGHT.SIMPLE;
         const edge = group.get("item");
         if (edge.hasState(State.HIGHLIGHTE)) {
-          strokeColor = theme === "dark" ? "#FFC107" : "#FFF3CD";
+          strokeColor =
+            theme === "dark" ? COLOR.DARK.HIGHLIGHT : COLOR.LIGHT.HIGHLIGHT;
         } else if (edge.hasState(State.GIT)) {
-          strokeColor = theme === "dark" ? "#00BCD4" : "#E0F7FA";
+          strokeColor = theme === "dark" ? COLOR.DARK.GIT : COLOR.LIGHT.GIT;
         } else if (edge.hasState(State.IMPORT)) {
-          strokeColor = theme === "dark" ? "#28A745" : "#D4EDDA";
+          strokeColor =
+            theme === "dark" ? COLOR.DARK.IMPORT : COLOR.LIGHT.IMPORT;
         }
         const shape = group.addShape("path", {
           attrs: {
@@ -181,14 +232,16 @@ export default function StaticTree() {
       draw(cfg, group) {
         const { startPoint, endPoint } = cfg;
 
-        let strokeColor = theme === "dark" ? "#8f71f3" : "#3a0fc6";
+        let strokeColor = "red";
         const edge = group.get("item");
         if (edge.hasState(State.HIGHLIGHTE)) {
-          strokeColor = theme === "dark" ? "#FFC107" : "#FFF3CD";
+          strokeColor =
+            theme === "dark" ? COLOR.DARK.HIGHLIGHT : COLOR.LIGHT.HIGHLIGHT;
         } else if (edge.hasState(State.GIT)) {
-          strokeColor = theme === "dark" ? "#00BCD4" : "#E0F7FA";
+          strokeColor = theme === "dark" ? COLOR.DARK.GIT : COLOR.LIGHT.GIT;
         } else if (edge.hasState(State.IMPORT)) {
-          strokeColor = theme === "dark" ? "#28A745" : "#D4EDDA";
+          strokeColor =
+            theme === "dark" ? COLOR.DARK.IMPORT : COLOR.LIGHT.IMPORT;
         }
         const shape = group.addShape("line", {
           attrs: {
@@ -227,6 +280,20 @@ export default function StaticTree() {
       // 先尝试展开节点
       const rawItem = graphRef.current.findById(id) as G6.Node;
       if (rawItem) expandNode(rawItem, true);
+      else {
+        let path = [];
+        G6.Util.traverseTree(cloneData, (node) => {
+          if (node.id === id) {
+            path = [...node.path];
+            return false;
+          }
+        });
+        path.length &&
+          path.forEach((id) => {
+            const rawItem = graphRef.current.findById(id) as G6.Node;
+            if (rawItem) expandNode(rawItem, true);
+          });
+      }
 
       const item = graphRef.current.findById(id) as G6.Node;
       if (!item) return;
@@ -268,7 +335,10 @@ export default function StaticTree() {
       }
       subTree.id = rootPath + subTree.id;
       //初始化折叠状态
-      subTree.collapsed = false;
+      subTree.collapsed = subTree.depth >= 2 ? true : false;
+      for (let i = 0; i < subTree.path.length; i++) {
+        subTree.path[i] = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
+      }
       return true;
     });
     setCloneData(newData);
@@ -327,15 +397,16 @@ export default function StaticTree() {
       },
       nodeStateStyles: {
         highlight: {
-          stroke: theme === "dark" ? "#FFC107" : "#FFF3CD",
+          stroke:
+            theme === "dark" ? COLOR.DARK.HIGHLIGHT : COLOR.LIGHT.HIGHLIGHT,
           lineWidth: 2,
         },
         gitChanged: {
-          stroke: theme === "dark" ? "#00BCD4" : "#E0F7FA",
+          stroke: theme === "dark" ? COLOR.DARK.GIT : COLOR.LIGHT.GIT,
           lineWidth: 2,
         },
         importChanged: {
-          stroke: theme === "dark" ? "#28A745" : "#D4EDDA",
+          stroke: theme === "dark" ? COLOR.DARK.IMPORT : COLOR.LIGHT.IMPORT,
           lineWidth: 2,
         },
       },
@@ -415,8 +486,7 @@ export default function StaticTree() {
         graph.translate(offsetX, offsetY);
         graph.zoom(zoom);
         graph.refresh();
-
-        // graph.fitView();
+        refreshGitAndImportChangedNodes();
       } else {
         e.stopPropagation();
         clearHighlight();
@@ -444,6 +514,7 @@ export default function StaticTree() {
   }, [cloneData]);
 
   useEffect(() => {
+    showGitChangedNodesRef.current = showGitChangedNodes;
     handleNodeState(gitChangedNodes, State.GIT, showGitChangedNodes);
     // 如果取消当前节点的git状态，则再次执行import状态，以防止git状态的取消影响到import状态
     if (showImportChangedNodes && !showGitChangedNodes) {
@@ -452,6 +523,7 @@ export default function StaticTree() {
   }, [showGitChangedNodes]);
 
   useEffect(() => {
+    showImportChangedNodesRef.current = showImportChangedNodes;
     handleNodeState(importChangedNodes, State.IMPORT, showImportChangedNodes);
     if (showGitChangedNodes && !showImportChangedNodes) {
       handleNodeState(gitChangedNodes, State.GIT, showGitChangedNodes);
@@ -459,9 +531,16 @@ export default function StaticTree() {
   }, [showImportChangedNodes]);
 
   useEffect(() => {
+    gitChangedNodesRef.current = gitChangedNodes;
+  }, [gitChangedNodes]);
+
+  useEffect(() => {
+    importChangedNodesRef.current = importChangedNodes;
+  }, [importChangedNodes]);
+
+  useEffect(() => {
     if (!window) return;
     window.onresize = throttle(() => {
-      console.log("hahah");
       containerRef.current.style.width = `${document.documentElement.clientWidth}px`;
       containerRef.current.style.height = `${document.documentElement.clientHeight}px`;
       if (graphRef.current) {
@@ -474,6 +553,7 @@ export default function StaticTree() {
     };
   }, []);
 
+  // 用于展开节点
   const expandNode = useCallback(
     (item: G6.Node, flag: boolean) => {
       if (!graphRef.current) return;
@@ -488,6 +568,18 @@ export default function StaticTree() {
       graphRef.current.updateItem(item, {
         collapsed: !flag,
       });
+      if (flag) {
+        //展开路径上的所有节点
+        const ids = model.path as string[];
+        ids.forEach((id) => {
+          const node = graphRef.current.findById(id) as G6.Node;
+          if (node) {
+            graphRef.current.updateItem(node, {
+              collapsed: false,
+            });
+          }
+        });
+      }
       graphRef.current.changeData(cloneData);
       circleMap.forEach((k, v) => {
         if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
@@ -502,6 +594,7 @@ export default function StaticTree() {
       graphRef.current.translate(offsetX, offsetY);
       graphRef.current.zoom(zoom);
       graphRef.current.refresh();
+      refreshGitAndImportChangedNodes();
     },
     [graphRef, cloneData, circleMap],
   );
@@ -552,6 +645,15 @@ export default function StaticTree() {
       item.setState(state, false);
       graphRef.current.refreshItem(item);
     });
+  };
+
+  const refreshGitAndImportChangedNodes = () => {
+    //如果原本git节点显示了，那折叠后恢复
+    showGitChangedNodesRef.current &&
+      handleNodeState(gitChangedNodesRef.current, State.GIT, true);
+    //如果原本import节点显示了，那折叠后恢复
+    showImportChangedNodesRef.current &&
+      handleNodeState(importChangedNodesRef.current, State.IMPORT, true);
   };
 
   return (
