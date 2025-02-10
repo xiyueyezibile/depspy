@@ -4,7 +4,6 @@ import { shallow } from "zustand/shallow";
 import { useEffect, useState, useMemo } from "react";
 import useLanguage from "@/i18n/hooks/useLanguage";
 import { useStore } from "@/contexts";
-import Tag from "../components/Tag";
 
 export const Selected = () => {
   const { staticRoot, highlightedNodeIds } = useStaticStore(
