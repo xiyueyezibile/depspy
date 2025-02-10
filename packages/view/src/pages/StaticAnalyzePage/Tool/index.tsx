@@ -4,6 +4,8 @@ import { useStaticStore } from "@/contexts";
 import { shallow } from "zustand/shallow";
 // import { DropDownProps } from "./type";
 import ToggleButton from "./ToggleButton";
+import useLanguage from "@/i18n/hooks/useLanguage";
+import { useStore } from "@/contexts";
 
 const Tool = () => {
   const {
@@ -18,6 +20,13 @@ const Tool = () => {
     }),
     shallow,
   );
+  const { language } = useStore(
+    (state) => ({
+      language: state.language,
+    }),
+    shallow,
+  );
+  const { t } = useLanguage();
 
   // 获取三种文件树--->构建treeOptions
   // {
@@ -32,13 +41,13 @@ const Tool = () => {
   return (
     <div className="w-80 h-20 -z-50 text-light flex  border-cyan justify-around">
       <ToggleButton
-        label="git变更文件"
+        label={t("static.gitChanged")}
         onChange={(e) => {
           setShowGitChangedNodes(e);
         }}
       />
       <ToggleButton
-        label="import变更文件"
+        label={t("static.importChanged")}
         onChange={(e) => {
           setShowImportChangedNodes(e);
         }}

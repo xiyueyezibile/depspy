@@ -66,7 +66,18 @@
       "choose": {
         "global": "全局",
         "select": "选中"
+      },
+      "select": {
+        "export": {
+          "remove": "移除的导出",
+          "render": "加载的导出"
+        }
+      },
+      "global": {
+        "count": "当前数量"
       }
-    }
+    },
+    "gitChanged": "Git 变更",
+    "importChanged": "导入变更"
   }
 }

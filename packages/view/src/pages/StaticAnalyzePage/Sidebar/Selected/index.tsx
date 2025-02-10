@@ -2,6 +2,8 @@ import { useStaticStore } from "@/contexts";
 import { traverseTree } from "../../utils";
 import { shallow } from "zustand/shallow";
 import { useEffect, useState, useMemo } from "react";
+import useLanguage from "@/i18n/hooks/useLanguage";
+import { useStore } from "@/contexts";
 
 export const Selected = () => {
   const { staticRoot, highlightedNodeIds } = useStaticStore(
@@ -11,6 +13,13 @@ export const Selected = () => {
     }),
     shallow,
   );
+  const { language } = useStore(
+    (state) => ({
+      language: state.language,
+    }),
+    shallow,
+  );
+  const { t } = useLanguage();
 
   //用于渲染节点信息列表
   const [selectNodeInfo, setSelectNodeInfo] = useState<SelectNodeInfo[]>([]);
@@ -43,7 +52,8 @@ export const Selected = () => {
           </h2>
           <div className="mb-2">
             <p className="text-[var(--color-text)] font-semibold">
-              Removed Exports:
+              {/* Removed Exports: */}
+              {t("static.sidebar.select.export.remove")}
             </p>
             {item.removedExports.length && (
               <ul className="list-disc list-inside text-[var(--color-text-description)]">
@@ -55,7 +65,8 @@ export const Selected = () => {
           </div>
           <div>
             <p className="text-[var(--color-text)] font-semibold">
-              Rendered Exports:
+              {/* Rendered Exports: */}
+              {t("static.sidebar.select.export.render")}
             </p>
             {item.renderedExports.length && (
               <ul className="list-disc list-inside text-[var(--color-text-description)]">
@@ -68,7 +79,7 @@ export const Selected = () => {
         </div>
       );
     });
-  }, [selectNodeInfo]);
+  }, [selectNodeInfo, language]);
 
   return (
     <>

@@ -3,27 +3,9 @@ import * as G6 from "@antv/g6";
 import { useStaticStore, useStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 import { shallow } from "zustand/shallow";
-
-const State = Object.freeze({
-  HIGHLIGHTE: "highlight",
-  GIT: "gitChanged",
-  IMPORT: "importChanged",
-});
-
-const COLOR = Object.freeze({
-  DARK: {
-    SIMPLE: "rgb(167,167,167)",
-    HIGHLIGHT: "#FFC107",
-    GIT: "#00BCD4",
-    IMPORT: "#BC00D4",
-  },
-  LIGHT: {
-    SIMPLE: "#a992f6",
-    HIGHLIGHT: "#000",
-    GIT: "#878300",
-    IMPORT: "#008387",
-  },
-});
+import { State, COLOR } from "./constant";
+import { deepClone } from "@/utils/deepClone";
+import { throttle } from "@/utils/throttle";
 
 export default function StaticTree() {
   const {
@@ -274,7 +256,6 @@ export default function StaticTree() {
       graphRef.current.setItemState(edge, State.HIGHLIGHTE, false);
       graphRef.current.refreshItem(edge);
     });
-
     //为当前item添加高亮状态
     highlightedNodeIds.forEach((id) => {
       // 先尝试展开节点
@@ -288,10 +269,15 @@ export default function StaticTree() {
             return false;
           }
         });
+
+        const updatedIds = new Set<string>();
         path.length &&
           path.forEach((id) => {
-            const rawItem = graphRef.current.findById(id) as G6.Node;
-            if (rawItem) expandNode(rawItem, true);
+            if (!updatedIds.has(id)) {
+              const rawItem = graphRef.current.findById(id) as G6.Node;
+              if (rawItem) expandNode(rawItem, true);
+              updatedIds.add(id);
+            }
           });
       }
 
@@ -571,12 +557,16 @@ export default function StaticTree() {
       if (flag) {
         //展开路径上的所有节点
         const ids = model.path as string[];
+        const updatedIds = new Set<string>();
         ids.forEach((id) => {
-          const node = graphRef.current.findById(id) as G6.Node;
-          if (node) {
-            graphRef.current.updateItem(node, {
-              collapsed: false,
-            });
+          if (!updatedIds.has(id)) {
+            const node = graphRef.current.findById(id) as G6.Node;
+            if (node) {
+              graphRef.current.updateItem(node, {
+                collapsed: false,
+              });
+              updatedIds.add(id);
+            }
           }
         });
       }
@@ -660,30 +650,3 @@ export default function StaticTree() {
     <div id="container" ref={containerRef} className="w-100vw h-100vh"></div>
   );
 }
-
-//深拷贝
-const deepClone = (obj) => {
-  if (obj === null || typeof obj !== "object") {
-    return obj;
-  }
-  const clone = Array.isArray(obj) ? [] : {};
-  for (const key in obj) {
-    if (Object.hasOwnProperty.call(obj, key)) {
-      clone[key] = deepClone(obj[key]);
-    }
-  }
-  return clone;
-};
-
-//节流
-const throttle = (func, delay) => {
-  let timer = null;
-  return function () {
-    if (!timer) {
-      func.apply(this, arguments);
-      timer = setTimeout(() => {
-        timer = null;
-      }, delay);
-    }
-  };
-};

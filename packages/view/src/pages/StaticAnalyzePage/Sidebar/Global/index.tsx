@@ -3,7 +3,7 @@ import { useStaticStore } from "@/contexts";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { shallow } from "zustand/shallow";
 import { extractFileName } from "../../utils";
-
+import useLanguage from "@/i18n/hooks/useLanguage";
 export const Global = () => {
   const [activeTab, setActiveTab] = useState<"git" | "import">("git");
   const { gitChangedNodes, importChangedNodes, setHighlightedNodeIds } =
@@ -20,6 +20,7 @@ export const Global = () => {
   const [importMap, setImportMap] = useState<Map<string, Set<string>>>(
     new Map(),
   );
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!gitChangedNodes.size) return;
@@ -100,16 +101,19 @@ export const Global = () => {
     <div className="h-full flex flex-col">
       <header className="flex gap-2 p-2 border-b">
         <SidebarButton onClick={() => setActiveTab("git")}>
-          Git 变更
+          {/* Git 变更 */}
+          {t("static.gitChanged")}
         </SidebarButton>
 
         <SidebarButton onClick={() => setActiveTab("import")}>
-          导入变更
+          {/* 导入变更 */}
+          {t("static.importChanged")}
         </SidebarButton>
       </header>
 
       <div className="p-4 font-bold border-b min-w-40">
-        当前数量：
+        {/* 当前数量 */}
+        {t("static.sidebar.global.count")}：
         <span className="text-[var(--color-primary-text)]">{totalCount}</span>
       </div>
 
