@@ -34,7 +34,10 @@ export const Sidebar = () => {
         onMouseDown={draggleMouseDown}
         className="w-[2px] h-[100%] cursor-col-resize absolute translate-x-[-50%] bg-border"
       ></div>
-      <div ref={containerRef} className="w-full h-[100%] text-text">
+      <div
+        ref={containerRef}
+        className="sidebar-container w-90 h-[100%] text-text overflow-y-auto"
+      >
         {choose === "global" ? <Global /> : <Selected />}
       </div>
       <div

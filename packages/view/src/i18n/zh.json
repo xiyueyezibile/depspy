@@ -70,7 +70,9 @@
       "select": {
         "export": {
           "remove": "移除的导出",
-          "render": "加载的导出"
+          "render": "加载的导出",
+          "noRemove": "没有移除的导出...",
+          "noRender": "没有加载的导出..."
         }
       },
       "global": {

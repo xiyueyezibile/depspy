@@ -4,6 +4,7 @@ import { shallow } from "zustand/shallow";
 import { useEffect, useState, useMemo } from "react";
 import useLanguage from "@/i18n/hooks/useLanguage";
 import { useStore } from "@/contexts";
+import Tag from "../components/Tag";
 
 export const Selected = () => {
   const { staticRoot, highlightedNodeIds } = useStaticStore(
@@ -53,27 +54,47 @@ export const Selected = () => {
           <div className="mb-2">
             <p className="text-[var(--color-text)] font-semibold">
               {/* Removed Exports: */}
-              {t("static.sidebar.select.export.remove")}
+              {t("static.sidebar.select.export.remove")}:
             </p>
-            {item.removedExports.length && (
-              <ul className="list-disc list-inside text-[var(--color-text-description)]">
+            {item.removedExports.length ? (
+              <div className="list-disc list-inside text-[var(--color-text-description)] mt-2">
                 {item.removedExports.map((exportItem, index) => (
-                  <li key={index}>{exportItem}</li>
+                  <div
+                    key={index}
+                    className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                  >
+                    {exportItem}
+                  </div>
                 ))}
-              </ul>
+              </div>
+            ) : (
+              <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+                {/* 没有移除的导出... */}
+                {t("static.sidebar.select.export.noRemove")}
+              </div>
             )}
           </div>
           <div>
             <p className="text-[var(--color-text)] font-semibold">
               {/* Rendered Exports: */}
-              {t("static.sidebar.select.export.render")}
+              {t("static.sidebar.select.export.render")}:
             </p>
-            {item.renderedExports.length && (
-              <ul className="list-disc list-inside text-[var(--color-text-description)]">
+            {item.renderedExports.length ? (
+              <div className="list-disc list-inside text-[var(--color-text-description)] mt-2">
                 {item.renderedExports.map((exportItem, index) => (
-                  <li key={index}>{exportItem}</li>
+                  <div
+                    key={index}
+                    className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                  >
+                    {exportItem}
+                  </div>
                 ))}
-              </ul>
+              </div>
+            ) : (
+              <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+                {/* 没有加载的导出... */}
+                {t("static.sidebar.select.export.noRender")}
+              </div>
             )}
           </div>
         </div>
