@@ -1,4 +1,5 @@
-import { ExportEffectedNode } from "./getAllExportEffected";
+import { ExportEffectedNodeSerializable } from "../type";
+import { ExportEffectedNode } from "./utils";
 import { getGitRootPath } from "./utils";
 import { GetModuleInfo, ModuleInfo } from "rollup";
 
@@ -31,11 +32,9 @@ interface ModuleTree {
   removedExports: string[];
   renderedExports: string[];
   // 该文件的哪些导出有改动
-  changedExports: string[];
+  exportEffectedNamesToReasons: ExportEffectedNodeSerializable["exportEffectedNamesToReasons"];
   // 该文件的哪些导入有改动, 例如 { './a': ['a','default'] }
-  changedImports: {
-    [source: string]: string[];
-  };
+  importEffectedNames: ExportEffectedNodeSerializable["importEffectedNames"];
 }
 
 class Module {
@@ -235,7 +234,9 @@ class ModuleGraph {
       id = `1`;
     }
     const nameArr = entryId.split("/");
-    const exportEffect = this.bundle.allExportEffected.get(entryId);
+    const exportEffect = this.bundle.allExportEffected
+      .get(entryId)
+      ?.getSerializableNode();
 
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
@@ -256,18 +257,10 @@ class ModuleGraph {
       isGitChange: Boolean(exportEffect?.isGitChange),
       isImportChange: Boolean(exportEffect?.isImportChange),
       isSideEffectChange: Boolean(exportEffect?.isSideEffectChange),
-      changedExports: exportEffect
-        ? Array.from(exportEffect.exportEffectedNames)
-        : [],
-      changedImports: Array.from(
-        exportEffect?.importEffectedNames.entries() || [],
-      ).reduce((pre, [key, value]) => {
-        // map转对象
-        return {
-          ...pre,
-          [key]: Array.from(value),
-        };
-      }, {}),
+      exportEffectedNamesToReasons: exportEffect
+        ? exportEffect.exportEffectedNamesToReasons
+        : {},
+      importEffectedNames: exportEffect ? exportEffect.importEffectedNames : {},
     };
     return tree;
   }
@@ -277,10 +270,11 @@ class ModuleGraph {
     parent: ModuleTree | null = null,
   ): ModuleTree | null {
     const tree: ModuleTree = this.initTreeNodeData(entryId, parent);
-    if (tree.changedExports.length > 0) {
+    const changedExports = Object.keys(tree.exportEffectedNamesToReasons);
+    if (changedExports.length > 0) {
       this.collectedEntryAndExportToFileNames(
         entryId,
-        tree.changedExports,
+        changedExports,
         tree.path,
       );
     }

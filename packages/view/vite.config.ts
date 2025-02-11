@@ -4,8 +4,9 @@ import UnoCSS from "unocss/vite";
 import path from "path";
 import generate404 from "./plugins/generate404";
 import neutralization from "./plugins/neutralization";
-import { vitePluginDepSpy } from "@dep-spy/cli";
+import { vitePluginDepSpy } from "@dep-spy/core/vite-plugin-dep-spy";
 
+//@ts-ignore
 export default defineConfig(({ mode }) => {
   const { VITE_BUILD_MODE } = loadEnv(mode, path.join(process.cwd(), "env"));
   return {
@@ -23,6 +24,7 @@ export default defineConfig(({ mode }) => {
     envDir: "./env",
 
     plugins: [
+      vitePluginDepSpy(),
       reactPlugin(),
       UnoCSS(),
       generate404(),
@@ -37,7 +39,6 @@ export default defineConfig(({ mode }) => {
         "fs",
         "path",
       ]),
-      vitePluginDepSpy(),
     ],
     resolve: {
       alias: {

@@ -9,6 +9,7 @@ import {
   readFileSyncSafe,
   SourceToImportId,
   isPathNeedFilter,
+  ExportEffectedNode,
 } from "./utils";
 import { PluginContext } from "rollup";
 import { getTreeShakingDetail as _getTreeShakingDetail } from "./getTreeShakingDetail";
@@ -24,18 +25,6 @@ const targetExt = new Set<string>([
   ".html",
 ]);
 // 绝对路径=>导出受到影响的导出
-export interface ExportEffectedNode {
-  // 受影响的导出
-  exportEffectedNames: Set<string>;
-  // 受影响的导入,例如：{ "/user/code/a.ts": ["a","b","default"] }
-  importEffectedNames: Map<string, Set<string>>;
-  // 是否有代码变更
-  isGitChange?: boolean;
-  // 是否有导入变更
-  isImportChange?: boolean;
-  // 是否有副作用变更
-  isSideEffectChange?: boolean;
-}
 const importIdToExportEffected: Map<string, ExportEffectedNode> = new Map();
 
 // 记录已经进入的处理队列的Promise
@@ -108,10 +97,7 @@ async function _getAllExportEffect(
     entry.includes("node_modules")
   ) {
     // 构造空节点
-    const exportEffect: ExportEffectedNode = {
-      exportEffectedNames: new Set(),
-      importEffectedNames: new Map(),
-    };
+    const exportEffect: ExportEffectedNode = new ExportEffectedNode();
     importIdToExportEffected.set(entry, exportEffect);
     paths.delete(entry);
     return importIdToExportEffected;
@@ -149,10 +135,7 @@ async function _getAllExportEffect(
   await Promise.all(importDepPromise);
   const preCode = getFileContentAtCommit(entry, "HEAD");
   const curCode = readFileSyncSafe(entry);
-  const exportChanges: ExportEffectedNode = {
-    exportEffectedNames: new Set(),
-    importEffectedNames: new Map(),
-  };
+  const exportChanges: ExportEffectedNode = new ExportEffectedNode();
   const exportEffectPromise: Promise<void>[] = [];
   // 遍历当前文件的导出，判断各个导出是否有变动
   if (currentInfo?.exports.length) {
@@ -177,7 +160,9 @@ async function _getAllExportEffect(
           const preHash = getHashFromString(pre.treeShakingCode);
           if (curHash !== preHash) {
             exportChanges.isGitChange = true;
-            exportChanges.exportEffectedNames.add(exportName);
+            exportChanges.addExportEffectedNameToReason(exportName, {
+              isNativeCodeChange: true,
+            });
           }
         }
         // 该导出依赖的静态引入是否变动
@@ -193,25 +178,21 @@ async function _getAllExportEffect(
               // 2. 全量引入且该引入文件的受影响的导出不为空
               // 3. 该引入文件有副作用变动
               if (
-                sourceExportEffect?.exportEffectedNames.has(_import) ||
+                sourceExportEffect?.exportEffectedNamesToReasons.has(_import) ||
                 (_import === "*" &&
-                  sourceExportEffect?.exportEffectedNames.size) ||
+                  sourceExportEffect?.exportEffectedNamesToReasons.size) ||
                 sourceExportEffect.isSideEffectChange
               ) {
-                // 构建exportChanges节点
+                // 标记该节点有导入变动
                 exportChanges.isImportChange = true;
-                const importEffectedName =
-                  exportChanges.importEffectedNames.get(importId);
-                if (importEffectedName) {
-                  importEffectedName.add(_import);
-                } else {
-                  // 首次进入进入逻辑
-                  exportChanges.importEffectedNames.set(
-                    importId,
-                    new Set([_import]),
-                  );
-                }
-                exportChanges.exportEffectedNames.add(exportName);
+                // 记录该文件受到了哪些导入的影响
+                exportChanges.addImportEffectedName(importId, _import);
+                // 记录该导出受到了哪些导入的影响
+                exportChanges.addExportEffectedNameToReason(exportName, {
+                  importEffectedNames: new Map([
+                    [importId, new Set([_import])],
+                  ]),
+                });
               }
             });
           }
@@ -223,16 +204,19 @@ async function _getAllExportEffect(
             sourceToImportIdMap.getImportIdBySource(source, entry) || "";
           // 动态引入的文件是否有导出受到影响
           const hasExportEffected = Boolean(
-            importIdToExportEffected.get(importId)?.exportEffectedNames.size,
+            importIdToExportEffected.get(importId)?.exportEffectedNamesToReasons
+              .size,
           );
           // 如果动态引入有变化，则该导出受到影响
           if (hasExportEffected) {
             // 标记该节点有导入变动
             exportChanges.isImportChange = true;
-            // 动态导入默认为全量引入，所以影响添加为*
-            exportChanges.importEffectedNames.set(importId, new Set(["*"]));
-            // 标记该导出受到影响
-            exportChanges.exportEffectedNames.add(exportName);
+            // 记录该文件受到了哪些导入的影响,动态导入默认为全量引入，所以影响添加为*
+            exportChanges.addImportEffectedName(importId, "*");
+            // 记录该导出受到了哪些导入的影响
+            exportChanges.addExportEffectedNameToReason(exportName, {
+              importEffectedNames: new Map([[importId, new Set(["*"])]]),
+            });
           }
         });
       });
@@ -252,18 +236,15 @@ async function _getAllExportEffect(
       const exportEffected = importIdToExportEffected.get(importId);
       // 1. 该引入有改动的导出有变化 2. 该引入副作用有变化
       if (
-        exportEffected?.exportEffectedNames.size ||
+        exportEffected?.exportEffectedNamesToReasons.size ||
         exportEffected?.isSideEffectChange
       ) {
+        // 标记该节点有导入变动
         exportChanges.isImportChange = true;
         // 没有导出的文件，可以直接标记为副作用变动
         exportChanges.isSideEffectChange = true;
         // 因为是html的script引入，所以默认为全量引入
-        // 增量加入
-        exportChanges.importEffectedNames.set(
-          importId,
-          exportEffected.exportEffectedNames,
-        );
+        exportChanges.addImportEffectedName(importId, "*");
       }
     });
   }

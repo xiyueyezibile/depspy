@@ -1,10 +1,8 @@
 import path from "path";
-import { sendDataByChunk, SourceToImportId } from "./utils";
+import { ExportEffectedNode, sendDataByChunk, SourceToImportId } from "./utils";
 import { Bundle, idInExternals } from "./staticModule";
 import { normalizePath, type PluginOption } from "vite";
-import getAllExportEffected, {
-  ExportEffectedNode,
-} from "./getAllExportEffected";
+import getAllExportEffected from "./getAllExportEffected";
 import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
 import { writeFileSync } from "fs";
 import { GetModuleInfo } from "rollup";

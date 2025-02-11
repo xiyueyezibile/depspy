@@ -32,3 +32,15 @@ export interface Config {
     codependency?: string;
   };
 }
+export interface ExportEffectedNodeSerializable {
+  isImportChange: boolean;
+  isSideEffectChange: boolean;
+  isGitChange: boolean;
+  exportEffectedNamesToReasons: {
+    [key: string]: {
+      isNativeCodeChange: boolean;
+      importEffectedNames: { [key: string]: string[] };
+    };
+  };
+  importEffectedNames: { [key: string]: string[] };
+}

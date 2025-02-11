@@ -4,10 +4,22 @@ import { findSourceToImportsFormAst, normalizeIdToFilePath } from "./utils";
 import path from "path";
 // 获取指定导出真正依赖的源码和真正依赖的引入（复用vite的treeshaking规范）
 interface GetTreeShakingDetailOptions {
+  // vite文件id，可能是绝对路径，也可能是虚拟路径
   entry: string;
+  // 源码
   code: string;
+  // 指定导出的名称，例如： default ｜ * ｜ getName
   exportName: string;
 }
+interface GetTreeShakingDetailResult {
+  // treeshaking后的代码
+  treeShakingCode: string;
+  // 依赖的源码的引入路径和对应引入的变量，例如：{ "./a": ["a","b","default"] }
+  sourceToImports: Map<string, Set<string>>;
+  // 依赖的动态import的集合，例如：("./a", "./b" , "lodash" )
+  dynamicallySource: Set<string>;
+}
+
 // 需要处理打包后代码的文件类型
 const extToTransformMap = new Map([
   [
@@ -20,7 +32,7 @@ const extToTransformMap = new Map([
 // 通过vite的treeshaking规范获取指定导出真正依赖的源码和真正依赖的引入
 export async function getTreeShakingDetail(
   options: GetTreeShakingDetailOptions,
-) {
+): Promise<GetTreeShakingDetailResult> {
   const { code, exportName, entry } = options;
   // 当前文件的后缀
   const ext = path.extname(normalizeIdToFilePath(entry));
@@ -125,8 +137,9 @@ export async function getTreeShakingDetail(
                   // 收集动态导入
                   dynamicallySource =
                     new Set(
-                      this.getModuleInfo(virtualSourceModuleId)
-                        ?.dynamicallyImportedIds,
+                      this.getModuleInfo(
+                        virtualSourceModuleId,
+                      )?.dynamicallyImportedIds,
                     ) || new Set();
                 }
               });

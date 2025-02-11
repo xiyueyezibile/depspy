@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { jsonsToBuffer } from "@dep-spy/utils";
 import http from "http";
+import { ExportEffectedNodeSerializable } from "../type";
 
 // 源码路径和绝对路径的互相映射
 export class SourceToImportId {
@@ -48,6 +49,94 @@ export class SourceToImportId {
       return true;
     }
     return false;
+  }
+}
+
+// 更方便的合并添加节点的影响
+export class ExportEffectedNode {
+  // 受影响的导出以及对应影响原因，key:导出名称（例如：default ，* ，xx ），value: 影响原因
+  exportEffectedNamesToReasons: Map<
+    string,
+    {
+      // 是否是因为本地代码变更导致的导出变更
+      isNativeCodeChange?: boolean;
+      // 是否是因为引入变更导致的导出变更，例如：{ "/user/code/a.ts": ["a","default"] }
+      // 和下面的importEffectedNames类型一致，只不过只是针对某个导出的依赖引入
+      importEffectedNames: Map<string, Set<string>>;
+    }
+  >;
+  // 受影响的导入,例如：{ "/user/code/a.ts": ["a","b","default","*"] }
+  importEffectedNames: Map<string, Set<string>>;
+  // 是否有代码变更
+  isGitChange?: boolean;
+  // 是否有导入变更
+  isImportChange?: boolean;
+  // 是否有副作用变更
+  isSideEffectChange?: boolean;
+  constructor() {
+    this.exportEffectedNamesToReasons = new Map();
+    this.importEffectedNames = new Map();
+  }
+  // 添加导出影响以及原因（深度合并）
+  addExportEffectedNameToReason(
+    exportName: string,
+    reason: {
+      isNativeCodeChange?: boolean;
+      importEffectedNames?: Map<string, Set<string>>;
+    },
+  ) {
+    const { isNativeCodeChange = false, importEffectedNames = new Map() } =
+      reason;
+    /* 如果存在该exportName，则深度合并传入数据和已有数据, 例如:
+     { "a": { isNativeCodeChange: false, importEffectedNames: { "/user/b.ts": ["b1"] } } }} 
+      + { "a": { isNativeCodeChange: true, importEffectedNames: { "/user/b.ts": ["b2"] } } }}
+      => { "a": { isNativeCodeChange: true, importEffectedNames: { "/user/b.ts": ["b1","b2"] } } }
+    */
+    // 如果存在该exportName，则深度合并传入数据和已有数据
+    if (this.exportEffectedNamesToReasons.has(exportName)) {
+      const exportEffectedReason =
+        this.exportEffectedNamesToReasons.get(exportName);
+      exportEffectedReason.isNativeCodeChange = isNativeCodeChange;
+      importEffectedNames.forEach((value, key) => {
+        const importEffectedName =
+          exportEffectedReason.importEffectedNames.get(key);
+        if (importEffectedName) {
+          value.forEach((v) => {
+            importEffectedName.add(v);
+          });
+        } else {
+          exportEffectedReason.importEffectedNames.set(key, value);
+        }
+      });
+      return;
+    }
+    // 不存在该exportName，且参数有意义，则新增
+    if (isNativeCodeChange || importEffectedNames.size) {
+      this.exportEffectedNamesToReasons.set(exportName, {
+        isNativeCodeChange,
+        importEffectedNames,
+      });
+    }
+  }
+  // 记录有变化的导入
+  addImportEffectedName(importId: string, importName: string) {
+    // 存在该导入，直接添加importName
+    if (this.importEffectedNames.has(importId)) {
+      this.importEffectedNames.get(importId)?.add(importName);
+      return;
+    }
+    // 不存在该导入，新增Set记录
+    this.importEffectedNames.set(importId, new Set([importName]));
+  }
+  // 将本节点的属性转化为可序列化的对象,主要是Map转对象，Set转数组
+  getSerializableNode() {
+    return deepClone({
+      isImportChange: this.isImportChange,
+      isGitChange: this.isGitChange,
+      isSideEffectChange: this.isSideEffectChange,
+      exportEffectedNamesToReasons: this.exportEffectedNamesToReasons,
+      importEffectedNames: this.importEffectedNames,
+    }) as unknown as ExportEffectedNodeSerializable;
   }
 }
 
@@ -128,8 +217,8 @@ export function getFileContentAtCommit(
 
 // 通过vite的id规范判读一个文件路径是不是commonjs规范
 export function isCommonJsById(importId: string) {
-  const query = importId.split("?");
-  return query.includes("commonjs-exports");
+  const query = importId.split("?")?.[1] || "";
+  return query.includes("commonjs");
 }
 
 // 通过vite的id安全的获取当前真实文件源码
@@ -226,7 +315,7 @@ export function cacheReturn<T extends (...args: any) => any>(
     if (cache.has(key)) {
       return cache.get(key);
     }
-    const value = callback.apply(callback, args);
+    const value = callback.apply(this, args);
     cache.set(key, value);
     return value;
   }
@@ -248,4 +337,52 @@ export function isPathNeedFilter(
     }
     return true;
   });
+}
+
+// 将嵌套的Map或者Set转化为可序列化的对象或者数组
+export function deepClone<T>(target: T): T {
+  const map = new WeakMap();
+  const stack = new Set<unknown>();
+
+  function isObject(obj: unknown): obj is object {
+    return typeof obj === "object" && obj !== null;
+  }
+
+  function cloneData(data: unknown): unknown {
+    if (!isObject(data)) return data;
+
+    if (stack.has(data)) {
+      throw new Error("Cannot clone object with circular reference");
+    }
+    stack.add(data);
+    const exist = map.get(data);
+    if (exist) return exist;
+    if (data instanceof Map) {
+      const result = {};
+      map.set(data, result);
+      data.forEach((value, key) => {
+        result[key] = cloneData(value);
+      });
+      return result;
+    }
+    if (data instanceof Set) {
+      const result = [];
+      map.set(data, result);
+      data.forEach((value) => {
+        result.push(cloneData(value));
+      });
+      return result;
+    }
+    const keys = Reflect.ownKeys(data);
+    const allDesc = Object.getOwnPropertyDescriptors(data);
+    const result = Object.create(Object.getPrototypeOf(data), allDesc);
+    map.set(data, result);
+    keys.forEach((key: PropertyKey) => {
+      const value = data[key as keyof typeof data];
+      result[key] = isObject(value) ? cloneData(value) : value;
+    });
+    stack.delete(data);
+    return result;
+  }
+  return cloneData(target) as T;
 }
