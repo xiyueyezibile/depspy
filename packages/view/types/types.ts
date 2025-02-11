@@ -34,8 +34,17 @@ export interface StaticNode {
   isGitChange: boolean;
   isImportChange: boolean;
   isSideEffectChange: boolean;
-  changedExports: string[];
-  changedImports: { [key: string]: string[] };
+  exportEffectedNamesToReasons: {
+    [key: string]: {
+      isNativeCodeChange?: boolean;
+      importEffectedNames: {
+        [key: string]: string[];
+      };
+    };
+  };
+  importEffectedNames: {
+    [key: string]: string[];
+  };
 }
 
 export interface generateGraphRes {

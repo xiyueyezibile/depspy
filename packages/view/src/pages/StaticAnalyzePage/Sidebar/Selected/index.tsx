@@ -1,5 +1,5 @@
 import { useStaticStore } from "@/contexts";
-import { traverseTree } from "../../utils";
+import { traverseTree, extractFileName } from "../../utils";
 import { shallow } from "zustand/shallow";
 import { useEffect, useState, useMemo } from "react";
 import useLanguage from "@/i18n/hooks/useLanguage";
@@ -29,8 +29,8 @@ export const Selected = () => {
     isGitChange: false,
     isImportChange: false,
     isSideEffectChange: false,
-    changedImports: {},
-    changedExports: [],
+    exportEffectedNamesToReasons: {},
+    importEffectedNames: {},
   });
 
   useEffect(() => {
@@ -44,8 +44,8 @@ export const Selected = () => {
           name: node.name,
           removedExports: node.removedExports,
           renderedExports: node.renderedExports,
-          changedImports: node.changedImports,
-          changedExports: node.changedExports,
+          exportEffectedNamesToReasons: node.exportEffectedNamesToReasons,
+          importEffectedNames: node.importEffectedNames,
           isGitChange: node.isGitChange,
           isImportChange: node.isImportChange,
           isSideEffectChange: node.isSideEffectChange,
@@ -53,6 +53,7 @@ export const Selected = () => {
       }
     });
     setSelectNodeInfo(res);
+    console.log(res);
   }, [highlightedNodeIds, staticRoot]);
 
   const SelectNodeCardList = useMemo(() => {
@@ -132,54 +133,86 @@ export const Selected = () => {
           )}
         </div>
 
-        {/* changedExports */}
-        <div className="mb-2">
-          <p className="text-[var(--color-text)] font-semibold">
-            {t("static.sidebar.select.export.changed")}:
-          </p>
-          {selectNodeInfo.changedExports.length ? (
-            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
-              {selectNodeInfo.changedExports.map((exportItem, index) => (
-                <div
-                  key={index}
-                  className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
-                >
-                  {exportItem}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
-              {/* No changedExports... */}
-              {t("static.sidebar.select.export.noChanged")}
-            </div>
-          )}
-        </div>
         {/* changedImports */}
         <div className="mb-2">
           <p className="text-[var(--color-text)] font-semibold">
             {t("static.sidebar.select.import.changed")}:
           </p>
-          {Object.keys(selectNodeInfo.changedImports).length ? (
+          {Object.keys(selectNodeInfo.importEffectedNames).length ? (
             <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
-              {Object.keys(selectNodeInfo.changedImports).map((Item) => (
-                <div key={Item}>
-                  <div className="pl-2">{Item}</div>
-                  {selectNodeInfo.changedImports[Item].map((valus, index) => (
-                    <div
-                      key={index}
-                      className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
-                    >
-                      {valus}
-                    </div>
-                  ))}
+              {Object.keys(selectNodeInfo.importEffectedNames).map((Item) => (
+                <div key={Item} className="text-[var(--color-text)]">
+                  <div className="pl-2">{extractFileName(Item)}</div>
+                  {selectNodeInfo.importEffectedNames[Item].map(
+                    (valus, index) => (
+                      <div
+                        key={index}
+                        className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 cursor-default"
+                      >
+                        {valus}
+                      </div>
+                    ),
+                  )}
                 </div>
               ))}
             </div>
           ) : (
             <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
-              {/* No changedImports... */}
               {t("static.sidebar.select.import.noChanged")}
+            </div>
+          )}
+        </div>
+
+        {/* changedExports */}
+        <div className="mb-2">
+          <p className="text-[var(--color-text)] font-semibold">
+            {t("static.sidebar.select.export.changed")}:
+          </p>
+          {Object.keys(selectNodeInfo.exportEffectedNamesToReasons).length ? (
+            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+              {!!Object.keys(selectNodeInfo.exportEffectedNamesToReasons)
+                .length &&
+                Object.keys(selectNodeInfo.exportEffectedNamesToReasons).map(
+                  (Item) => (
+                    <div
+                      key={Item}
+                      className="border-solid rounded-lg my-2 p-2"
+                    >
+                      <div className="text-[var(--color-text)] font-semibold">
+                        {Item}
+                      </div>
+                      <div>Reasons:</div>
+                      {selectNodeInfo.exportEffectedNamesToReasons[Item]
+                        .isNativeCodeChange && (
+                        <div className="inline-flex rounded-lg border-[var(--color-primary-border--active)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default">
+                          Native Code Changed
+                        </div>
+                      )}
+                      {Object.keys(
+                        selectNodeInfo.exportEffectedNamesToReasons[Item]
+                          .importEffectedNames,
+                      ).map((key) => (
+                        <div key={key} className="text-[var(--color-text)]">
+                          <div className="pl-2">{key}</div>
+                          {selectNodeInfo.exportEffectedNamesToReasons[
+                            Item
+                          ].importEffectedNames[key].map((valus, index) => (
+                            <div
+                              key={index}
+                              className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 cursor-default"
+                            >
+                              {valus}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ),
+                )}
+            </div>
+          ) : (
+            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+              {t("static.sidebar.select.export.noChanged")}
             </div>
           )}
         </div>
@@ -201,6 +234,15 @@ interface SelectNodeInfo {
   isGitChange: boolean;
   isImportChange: boolean;
   isSideEffectChange: boolean;
-  changedImports: { [key: string]: string[] };
-  changedExports: string[];
+  exportEffectedNamesToReasons: {
+    [key: string]: {
+      isNativeCodeChange?: boolean;
+      importEffectedNames: {
+        [key: string]: string[];
+      };
+    };
+  };
+  importEffectedNames: {
+    [key: string]: string[];
+  };
 }
