@@ -22,83 +22,169 @@ export const Selected = () => {
   const { t } = useLanguage();
 
   //用于渲染节点信息列表
-  const [selectNodeInfo, setSelectNodeInfo] = useState<SelectNodeInfo[]>([]);
+  const [selectNodeInfo, setSelectNodeInfo] = useState<SelectNodeInfo>({
+    name: "",
+    removedExports: [],
+    renderedExports: [],
+    isGitChange: false,
+    isImportChange: false,
+    isSideEffectChange: false,
+    changedImports: {},
+    changedExports: [],
+  });
 
   useEffect(() => {
-    if (!staticRoot || !highlightedNodeIds) return;
+    if (!staticRoot || !highlightedNodeIds.size) return;
     const rootPath = staticRoot.rootId;
-    const cloneSet = Array.from(highlightedNodeIds).map((id) => {
-      return id.replace(rootPath, "");
-    });
-    const res: SelectNodeInfo[] = [];
+    const selectId = Array.from(highlightedNodeIds)[0].replace(rootPath, "");
+    let res: SelectNodeInfo = null;
     traverseTree(staticRoot, (node) => {
-      if (cloneSet.includes(node.id)) {
-        res.push({
+      if (selectId === node.id) {
+        res = {
           name: node.name,
           removedExports: node.removedExports,
           renderedExports: node.renderedExports,
-        });
+          changedImports: node.changedImports,
+          changedExports: node.changedExports,
+          isGitChange: node.isGitChange,
+          isImportChange: node.isImportChange,
+          isSideEffectChange: node.isSideEffectChange,
+        };
       }
     });
     setSelectNodeInfo(res);
   }, [highlightedNodeIds, staticRoot]);
 
   const SelectNodeCardList = useMemo(() => {
-    return selectNodeInfo.map((item) => {
-      return (
-        <div className="w-full p-4 rounded-lg shadow-md mb-4">
-          <h2 className="text-[var(--color-primary-text)] text-xl font-bold mb-2">
-            {item.name}
-          </h2>
-          <div className="mb-2">
-            <p className="text-[var(--color-text)] font-semibold">
-              {/* Removed Exports: */}
-              {t("static.sidebar.select.export.remove")}:
-            </p>
-            {item.removedExports.length ? (
-              <div className="list-disc list-inside text-[var(--color-text-description)] mt-2">
-                {item.removedExports.map((exportItem, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
-                  >
-                    {exportItem}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
-                {/* 没有移除的导出... */}
-                {t("static.sidebar.select.export.noRemove")}
+    if (!selectNodeInfo.name) return null;
+    return (
+      <div className="w-full h-full p-4 rounded-lg shadow-md mb-4">
+        <h2 className="text-[var(--color-primary-text)] text-xl font-bold mb-2">
+          {selectNodeInfo.name}
+        </h2>
+
+        {/* bool类型字段展示 */}
+        <div className="mb-2">
+          <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+            {selectNodeInfo.isGitChange && (
+              <div className="inline-flex rounded-lg border-[var(--color-primary-border--active)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default">
+                Git Changed
               </div>
             )}
-          </div>
-          <div>
-            <p className="text-[var(--color-text)] font-semibold">
-              {/* Rendered Exports: */}
-              {t("static.sidebar.select.export.render")}:
-            </p>
-            {item.renderedExports.length ? (
-              <div className="list-disc list-inside text-[var(--color-text-description)] mt-2">
-                {item.renderedExports.map((exportItem, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
-                  >
-                    {exportItem}
-                  </div>
-                ))}
+            {selectNodeInfo.isImportChange && (
+              <div className="inline-flex rounded-lg border-[var(--color-primary-border--active)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default">
+                Import Changed
               </div>
-            ) : (
-              <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
-                {/* 没有加载的导出... */}
-                {t("static.sidebar.select.export.noRender")}
+            )}
+            {selectNodeInfo.isSideEffectChange && (
+              <div className="inline-flex rounded-lg border-[var(--color-primary-border--active)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default">
+                SideEffect Changed
               </div>
             )}
           </div>
         </div>
-      );
-    });
+
+        {/* Removed Exports: */}
+        <div className="mb-2">
+          <p className="text-[var(--color-text)] font-semibold">
+            {t("static.sidebar.select.export.remove")}:
+          </p>
+          {selectNodeInfo.removedExports.length ? (
+            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+              {selectNodeInfo.removedExports.map((exportItem, index) => (
+                <div
+                  key={index}
+                  className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                >
+                  {exportItem}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+              {/* 没有移除的导出... */}
+              {t("static.sidebar.select.export.noRemove")}
+            </div>
+          )}
+        </div>
+
+        {/* Rendered Exports: */}
+        <div>
+          <p className="text-[var(--color-text)] font-semibold">
+            {t("static.sidebar.select.export.render")}:
+          </p>
+          {selectNodeInfo.renderedExports.length ? (
+            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+              {selectNodeInfo.renderedExports.map((exportItem, index) => (
+                <div
+                  key={index}
+                  className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                >
+                  {exportItem}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+              {/* 没有加载的导出... */}
+              {t("static.sidebar.select.export.noRender")}
+            </div>
+          )}
+        </div>
+
+        {/* changedExports */}
+        <div className="mb-2">
+          <p className="text-[var(--color-text)] font-semibold">
+            {t("static.sidebar.select.export.changed")}:
+          </p>
+          {selectNodeInfo.changedExports.length ? (
+            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+              {selectNodeInfo.changedExports.map((exportItem, index) => (
+                <div
+                  key={index}
+                  className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                >
+                  {exportItem}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+              {/* No changedExports... */}
+              {t("static.sidebar.select.export.noChanged")}
+            </div>
+          )}
+        </div>
+        {/* changedImports */}
+        <div className="mb-2">
+          <p className="text-[var(--color-text)] font-semibold">
+            {t("static.sidebar.select.import.changed")}:
+          </p>
+          {Object.keys(selectNodeInfo.changedImports).length ? (
+            <div className="list-disc list-inside text-[var(--color-text-description)] my-2">
+              {Object.keys(selectNodeInfo.changedImports).map((Item) => (
+                <div key={Item}>
+                  <div className="pl-2">{Item}</div>
+                  {selectNodeInfo.changedImports[Item].map((valus, index) => (
+                    <div
+                      key={index}
+                      className="inline-flex rounded-lg border-[var(--color-primary-border)] border-solid p-2 m-2 text-[var(--color-text)] cursor-default"
+                    >
+                      {valus}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="w-full text-center text-lg text-[var(--color-primary-text)]">
+              {/* No changedImports... */}
+              {t("static.sidebar.select.import.noChanged")}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }, [selectNodeInfo, language]);
 
   return (
@@ -112,4 +198,9 @@ interface SelectNodeInfo {
   name: string;
   removedExports: string[];
   renderedExports: string[];
+  isGitChange: boolean;
+  isImportChange: boolean;
+  isSideEffectChange: boolean;
+  changedImports: { [key: string]: string[] };
+  changedExports: string[];
 }

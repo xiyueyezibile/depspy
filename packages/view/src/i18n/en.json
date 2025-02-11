@@ -71,8 +71,14 @@
         "export": {
           "remove": "Removed Exports",
           "render": "Rendered Exports",
+          "changed": "Changed Exports",
           "noRemove": "No Removed Exports...",
-          "noRender": "No Rendered Exports..."
+          "noRender": "No Rendered Exports...",
+          "noChanged": "No Changed Exports..."
+        },
+        "import": {
+          "changed": "Changed Imports",
+          "noChanged": "No Changed Imports..."
         }
       },
       "global": {
