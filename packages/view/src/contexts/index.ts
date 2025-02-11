@@ -1,10 +1,10 @@
 import { shallow } from "zustand/shallow";
 import { createWithEqualityFn } from "zustand/traditional";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { Node, StaticStore, Store } from "~/types";
+import type { Node, StaticStore, Store, StaticNode } from "~/types";
 import { linkContext } from "./linkContext";
 import { searchNode } from "./searchNode";
-import { StaticNode } from "@dep-spy/core";
+// import { StaticNode } from "@dep-spy/core";
 
 export const useStore = createWithEqualityFn<Store>()(
   subscribeWithSelector((set) => ({

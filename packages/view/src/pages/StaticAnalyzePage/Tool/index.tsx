@@ -5,7 +5,6 @@ import { shallow } from "zustand/shallow";
 // import { DropDownProps } from "./type";
 import ToggleButton from "./ToggleButton";
 import useLanguage from "@/i18n/hooks/useLanguage";
-import { useStore } from "@/contexts";
 
 const Tool = () => {
   const {
@@ -17,12 +16,6 @@ const Tool = () => {
       // setStaticRoot: state.setStaticRoot,
       setShowGitChangedNodes: state.setShowGitChangedNodes,
       setShowImportChangedNodes: state.setShowImportChangedNodes,
-    }),
-    shallow,
-  );
-  const { language } = useStore(
-    (state) => ({
-      language: state.language,
     }),
     shallow,
   );

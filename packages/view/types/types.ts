@@ -1,4 +1,4 @@
-import { StaticNode } from "@dep-spy/core";
+// import { StaticNode } from "@dep-spy/core";
 
 export interface Node {
   name: string;
@@ -17,6 +17,25 @@ export interface Node {
   dependenciesList: Record<string, string>;
   parent: Node | null;
   unfold?: boolean;
+}
+
+export interface StaticNode {
+  id: string;
+  name: string;
+  children: StaticNode[];
+  parentId: string;
+  pathId: string;
+  depth: number;
+  idpath: string[];
+  path: string[];
+  rootId?: string;
+  removedExports: string[];
+  renderedExports: string[];
+  isGitChange: boolean;
+  isImportChange: boolean;
+  isSideEffectChange: boolean;
+  changedExports: string[];
+  changedImports: { [key: string]: string[] };
 }
 
 export interface generateGraphRes {

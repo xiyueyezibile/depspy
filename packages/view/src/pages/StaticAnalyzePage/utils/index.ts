@@ -1,5 +1,7 @@
+import { StaticNode } from "~/types";
+
 //通过完整的路径 rootPath + pathId + '-' + id 截取name
-export const extractFileName = (path) => {
+export const extractFileName = (path: string) => {
   // 匹配包含 index 的路径
   const indexRegex = /\/([^/]+)\/index\.([^/]+)(?:-\d+)?$/;
   // 匹配不包含 index 的路径
@@ -18,14 +20,17 @@ export const extractFileName = (path) => {
   return null;
 };
 
-export const traverseTree = (node, callback: (node: Node) => void) => {
+export const traverseTree = (
+  node: StaticNode,
+  callback: (node: StaticNode) => void,
+) => {
   callback(node);
   for (const child of Object.values(node.children)) {
     traverseTree(child, callback);
   }
 };
 
-export const buildTree = (nodes) => {
+export const buildTree = (nodes: StaticNode[]) => {
   const nodeMap = new Map();
   let root = null;
   // 用于记录需要延迟挂载的子节点信息
