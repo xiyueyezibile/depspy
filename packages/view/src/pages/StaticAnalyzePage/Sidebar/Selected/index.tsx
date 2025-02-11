@@ -53,7 +53,6 @@ export const Selected = () => {
       }
     });
     setSelectNodeInfo(res);
-    console.log(res);
   }, [highlightedNodeIds, staticRoot]);
 
   const SelectNodeCardList = useMemo(() => {
