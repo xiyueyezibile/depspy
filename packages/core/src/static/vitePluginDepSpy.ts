@@ -111,19 +111,19 @@ export function vitePluginDepSpy(
       moduleGraph.analysisCircleModule(options.entry);
       /** 生成铺平的树 */
       const flatTree = moduleGraph.generateTiledTreeByRootId();
-      // const entryIdAndExportToFileNames = Array.from(
-      //   moduleGraph.entryIdAndExportToFileNames.entries() || [],
-      // ).map(([key, value]) => {
-      //   return {
-      //     [key]: Array.from(value),
-      //   };
-      // });
+      const entryIdAndExportToFileNames = Array.from(
+        moduleGraph.entryIdAndExportToFileNames.entries() || [],
+      ).map(([key, value]) => {
+        return {
+          [key]: Array.from(value),
+        };
+      });
       // 分块发送数据给服务器
       await sendDataByChunk(flatTree, "/collectBundle");
-      // await sendDataByChunk(
-      //   entryIdAndExportToFileNames,
-      //   "/collectEntryIdAndExportToFileNames",
-      // );
+      await sendDataByChunk(
+        entryIdAndExportToFileNames,
+        "/collectEntryIdAndExportToFileNames",
+      );
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(process.cwd(), jsonName);
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());

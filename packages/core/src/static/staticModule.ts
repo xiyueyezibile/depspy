@@ -1,4 +1,4 @@
-import { ExportEffectedNodeSerializable } from "../type";
+import { ExportEffectedNodeSerializable, Values } from "../type";
 import { ExportEffectedNode } from "./utils";
 import { getGitRootPath } from "./utils";
 import { GetModuleInfo, ModuleInfo } from "rollup";
@@ -202,24 +202,47 @@ class ModuleGraph {
   /** 收集函数粒度更改影响的文件 */
   collectedEntryAndExportToFileNames(
     entryId: string,
-    changeExports: string[],
-    path: string[],
+    changeExports: [
+      string,
+      Values<ExportEffectedNodeSerializable["exportEffectedNamesToReasons"]>,
+    ][],
   ) {
-    changeExports.forEach((exportName) => {
-      path.slice(0, -1).forEach((id) => {
-        const fullId = this.rootId + id;
-
-        if (this.entryIdAndExportToFileNames.has(`${entryId}//${exportName}`)) {
-          this.entryIdAndExportToFileNames
-            .get(`${entryId}//${exportName}`)
-            .add(fullId);
-        } else {
+    /**
+     * 1. 本地和导入都更改
+     * 2. 本地更改
+     * 3. 导入更改
+     */
+    changeExports.forEach(([exportName, reasons]) => {
+      // 本地更改
+      if (reasons.isNativeCodeChange) {
+        if (!this.entryIdAndExportToFileNames.has(`${entryId}//${exportName}`))
           this.entryIdAndExportToFileNames.set(
             `${entryId}//${exportName}`,
-            new Set([fullId]),
+            new Set([entryId]),
           );
-        }
-      });
+        else if (
+          !this.entryIdAndExportToFileNames
+            .get(`${entryId}//${exportName}`)
+            .has(entryId)
+        )
+          this.entryIdAndExportToFileNames
+            .get(`${entryId}//${exportName}`)
+            .add(entryId);
+      }
+      // 导入更改
+      Object.entries(reasons.importEffectedNames).forEach(
+        ([id, importNames]) => {
+          importNames.forEach((importName) => {
+            const fullId = `${id}//${importName}`;
+
+            if (this.entryIdAndExportToFileNames.has(fullId)) {
+              this.entryIdAndExportToFileNames.get(fullId).add(entryId);
+            } else {
+              this.entryIdAndExportToFileNames.set(fullId, new Set([entryId]));
+            }
+          });
+        },
+      );
     });
   }
   /**初始化树节点 */
@@ -270,13 +293,9 @@ class ModuleGraph {
     parent: ModuleTree | null = null,
   ): ModuleTree | null {
     const tree: ModuleTree = this.initTreeNodeData(entryId, parent);
-    const changedExports = Object.keys(tree.exportEffectedNamesToReasons);
+    const changedExports = Object.entries(tree.exportEffectedNamesToReasons);
     if (changedExports.length > 0) {
-      this.collectedEntryAndExportToFileNames(
-        entryId,
-        changedExports,
-        tree.path,
-      );
+      this.collectedEntryAndExportToFileNames(entryId, changedExports);
     }
 
     if (!parent) tree.rootId = this.rootId;

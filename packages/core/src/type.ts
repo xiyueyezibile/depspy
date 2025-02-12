@@ -44,3 +44,5 @@ export interface ExportEffectedNodeSerializable {
   };
   importEffectedNames: { [key: string]: string[] };
 }
+
+export type Values<T> = T[keyof T];

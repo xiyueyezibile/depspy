@@ -137,9 +137,8 @@ export async function getTreeShakingDetail(
                   // 收集动态导入
                   dynamicallySource =
                     new Set(
-                      this.getModuleInfo(
-                        virtualSourceModuleId,
-                      )?.dynamicallyImportedIds,
+                      this.getModuleInfo(virtualSourceModuleId)
+                        ?.dynamicallyImportedIds,
                     ) || new Set();
                 }
               });
