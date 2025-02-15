@@ -124,7 +124,8 @@ export const Global = () => {
               gitFileList
             ) : (
               <div className="text-gray-400 p-4 text-center">
-                暂无 Git 变动文件
+                {/* 暂无 Git 变动文件 */}
+                {t("static.sidebar.global.noGit")}
               </div>
             )}
           </div>
@@ -136,7 +137,8 @@ export const Global = () => {
               importFileList
             ) : (
               <div className="text-gray-400 p-4 text-center">
-                暂无受影响文件
+                {/* 暂无受影响文件 */}
+                {t("static.sidebar.global.noImport")}
               </div>
             )}
           </div>

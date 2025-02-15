@@ -82,7 +82,9 @@
         }
       },
       "global": {
-        "count": "Current count"
+        "count": "Current count",
+        "noGit": "No Git changed files",
+        "noImport": "No Import changed files"
       }
     },
     "gitChanged": "Git Changed",

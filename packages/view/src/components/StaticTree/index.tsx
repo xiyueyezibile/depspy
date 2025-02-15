@@ -256,36 +256,117 @@ export default function StaticTree() {
       graphRef.current.setItemState(edge, State.HIGHLIGHTE, false);
       graphRef.current.refreshItem(edge);
     });
-    //为当前item添加高亮状态
-    highlightedNodeIds.forEach((id) => {
-      // 先尝试展开节点
+
+    highlightNodesSequentially();
+    // graphRef.current.refresh();
+  }, [highlightedNodeIds]);
+
+  // 用于展开节点
+  const expandNode = useCallback(
+    (item: G6.Node, flag: boolean) => {
+      if (!graphRef.current) return;
+      const model = item.getModel();
+      if (!model.collapsed) return;
+      const matrix = graphRef.current.getGroup().getMatrix();
+
+      const zoom = graphRef.current.getZoom();
+      const offsetX = matrix[6] / zoom;
+      const offsetY = matrix[7] / zoom;
+
+      graphRef.current.updateItem(item, {
+        collapsed: !flag,
+      });
+      if (flag) {
+        //展开路径上的所有节点
+        const ids = model.path as string[];
+        const updatedIds = new Set<string>();
+        ids.forEach((id) => {
+          if (!updatedIds.has(id)) {
+            const node = graphRef.current.findById(id) as G6.Node;
+            if (node) {
+              graphRef.current.updateItem(node, {
+                collapsed: false,
+              });
+              updatedIds.add(id);
+            }
+          }
+        });
+      }
+      graphRef.current.changeData(cloneData);
+      circleMap.forEach((k, v) => {
+        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+          graphRef.current.addItem("edge", {
+            source: k,
+            target: v,
+            type: "circle-line",
+          });
+        }
+      });
+      //保持在展开折叠后树节点位置不变
+      graphRef.current.translate(offsetX, offsetY);
+      graphRef.current.zoom(zoom);
+      graphRef.current.refresh();
+      refreshGitAndImportChangedNodes();
+    },
+    [graphRef, cloneData, circleMap],
+  );
+
+  const expandNodeSequentially = useCallback(
+    async (id: string) => {
       const rawItem = graphRef.current.findById(id) as G6.Node;
-      if (rawItem) expandNode(rawItem, true);
-      else {
-        let path = [];
+
+      // 处理节点展开逻辑
+      if (rawItem) {
+        //如果图里能找到节点，则展开节点并等待渲染完成
+        expandNode(rawItem, true);
+        // 等待一帧确保渲染完成
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      } else {
+        // 如果找不到节点，则遍历数据查找路径，展开路径节点
+        let path: string[] = [];
         G6.Util.traverseTree(cloneData, (node) => {
           if (node.id === id) {
             path = [...node.path];
             return false;
           }
+          return true;
         });
 
         const updatedIds = new Set<string>();
-        path.length &&
-          path.forEach((id) => {
-            if (!updatedIds.has(id)) {
-              const rawItem = graphRef.current.findById(id) as G6.Node;
-              if (rawItem) expandNode(rawItem, true);
-              updatedIds.add(id);
+        if (path.length) {
+          for (const pid of path) {
+            if (!updatedIds.has(pid)) {
+              const rawPathItem = graphRef.current.findById(pid) as G6.Node;
+              if (rawPathItem) {
+                expandNode(rawPathItem, true);
+                // 每个路径节点展开后都等待渲染
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+              }
+              updatedIds.add(pid);
             }
-          });
+          }
+        }
       }
 
+      // 额外等待确保高亮效果渲染
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+    [graphRef.current, expandNode, highlightedNodeIds],
+  );
+
+  const highlightNodesSequentially = useCallback(async () => {
+    for (const id of highlightedNodeIds) {
+      await expandNodeSequentially(id);
+    }
+    for (const id of highlightedNodeIds) {
+      // 处理高亮逻辑
       const item = graphRef.current.findById(id) as G6.Node;
       if (!item) return;
-      const relatedEdges = item?.getEdges() || [];
+
+      const relatedEdges = item.getEdges() || [];
       graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
       graphRef.current.refreshItem(item);
+
       relatedEdges.forEach((edge) => {
         const {
           _cfg: { currentShape },
@@ -301,9 +382,8 @@ export default function StaticTree() {
           }
         }
       });
-    });
-    // graphRef.current.refresh();
-  }, [highlightedNodeIds]);
+    }
+  }, [highlightedNodeIds, graphRef.current, expandNodeSequentially]);
 
   useEffect(() => {
     const newData = deepClone(staticRoot);
@@ -538,56 +618,6 @@ export default function StaticTree() {
       window.onresize = null;
     };
   }, []);
-
-  // 用于展开节点
-  const expandNode = useCallback(
-    (item: G6.Node, flag: boolean) => {
-      if (!graphRef.current) return;
-      const model = item.getModel();
-      if (!model.collapsed) return;
-      const matrix = graphRef.current.getGroup().getMatrix();
-
-      const zoom = graphRef.current.getZoom();
-      const offsetX = matrix[6] / zoom;
-      const offsetY = matrix[7] / zoom;
-
-      graphRef.current.updateItem(item, {
-        collapsed: !flag,
-      });
-      if (flag) {
-        //展开路径上的所有节点
-        const ids = model.path as string[];
-        const updatedIds = new Set<string>();
-        ids.forEach((id) => {
-          if (!updatedIds.has(id)) {
-            const node = graphRef.current.findById(id) as G6.Node;
-            if (node) {
-              graphRef.current.updateItem(node, {
-                collapsed: false,
-              });
-              updatedIds.add(id);
-            }
-          }
-        });
-      }
-      graphRef.current.changeData(cloneData);
-      circleMap.forEach((k, v) => {
-        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-          graphRef.current.addItem("edge", {
-            source: k,
-            target: v,
-            type: "circle-line",
-          });
-        }
-      });
-      //保持在展开折叠后树节点位置不变
-      graphRef.current.translate(offsetX, offsetY);
-      graphRef.current.zoom(zoom);
-      graphRef.current.refresh();
-      refreshGitAndImportChangedNodes();
-    },
-    [graphRef, cloneData, circleMap],
-  );
 
   const handleNodeState = (
     nodeIds: Set<string>,
