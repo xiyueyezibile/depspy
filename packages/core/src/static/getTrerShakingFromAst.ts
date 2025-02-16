@@ -433,7 +433,7 @@ export function findLocalInfluence(
   const { imports, dynamicImports, dependencyList } =
     extractDependencyRelation(ast);
 
-  console.log(dependencyList);
+  // console.log(dependencyList);
   // console.log('所有导出: ', exports);
   // console.log('所有导入: ', imports);
   // console.log('所有动态导入: ', dynamicImports);

@@ -35,17 +35,7 @@ const importIdToExportEffectedPromise: Map<
 > = new Map();
 
 // 获取指定导出真正依赖的源码和真正依赖的引入（复用vite的treeshaking规范）(缓存化)
-const getTreeShakingDetail = cacheReturn(
-  process.env[DEP_SPY_VITE_BUILD]
-    ? _getTreeShakingDetail
-    : getTreeShakingDetailFromAst,
-  (options) => {
-    // 以参数作为唯一key进行缓存
-    return getHashFromString(
-      Object.values(options).reduce((pre, cur) => pre + cur, ""),
-    );
-  },
-);
+let getTreeShakingDetail: typeof _getTreeShakingDetail;
 // getAllExportEffect的包装层，避免外层因为本身的递归参数传入不必要的参数
 export default async function getAllExportEffect(
   // 入口绝对地址
@@ -56,6 +46,18 @@ export default async function getAllExportEffect(
   getModuleInfo: (importId: string) => ModuleInfo,
 ) {
   const { entry, ignores = [] } = options;
+  // 函数执行时才进行赋值，避免环境变量为空
+  getTreeShakingDetail = cacheReturn(
+    process.env[DEP_SPY_VITE_BUILD]
+      ? _getTreeShakingDetail
+      : getTreeShakingDetailFromAst,
+    (options) => {
+      // 以参数作为唯一key进行缓存
+      return getHashFromString(
+        Object.values(options).reduce((pre, cur) => pre + cur, ""),
+      );
+    },
+  );
   return await _getAllExportEffect(
     entry,
     ignores,
