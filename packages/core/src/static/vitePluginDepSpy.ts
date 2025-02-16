@@ -1,20 +1,18 @@
 import path from "path";
-import { ExportEffectedNode, sendDataByChunk, SourceToImportId } from "./utils";
-import { Bundle, idInExternals } from "./staticModule";
+import { sendDataByChunk, SourceToImportId } from "./utils";
+import { Bundle } from "./staticModule";
 import { normalizePath, type PluginOption } from "vite";
-import getAllExportEffected from "./getAllExportEffected";
-import { DEP_SPY_START, DEP_SPY_SUB_START } from "../constant";
+import {
+  DEP_SPY_START,
+  DEP_SPY_SUB_START,
+  DEP_SPY_VITE_BUILD,
+} from "../constant";
 import { writeFileSync } from "fs";
-import { GetModuleInfo } from "rollup";
+import { OutputBundle } from "rollup";
+import { GetModuleInfo, PluginDepSpyConfig } from "../type";
 
-export interface VitePluginDepSpyConfig {
-  // 项目的入口，默认为index.html
-  entry?: string;
-  // 忽略的文件路径，正则用test，字符串用includes
-  ignores?: (string | RegExp)[];
-}
 export function vitePluginDepSpy(
-  options: VitePluginDepSpyConfig = {},
+  options: PluginDepSpyConfig = {},
 ): PluginOption {
   //只能通过ds命令运行;
   if (!process.env[DEP_SPY_START]) {
@@ -24,8 +22,7 @@ export function vitePluginDepSpy(
   if (process.env[DEP_SPY_SUB_START]) {
     return false;
   }
-  // 收集项目整体打包信息
-  let globalBundle: Bundle;
+  process.env[DEP_SPY_VITE_BUILD] = "true";
 
   // 源码路径和绝对路径的互相映射
   const sourceToImportIdMap = new SourceToImportId();
@@ -41,8 +38,7 @@ export function vitePluginDepSpy(
       options.entry = options?.entry
         ? normalizePath(options.entry)
         : normalizePath(path.join(config.root, "index.html"));
-      // 初始化
-      globalBundle = new Bundle(options.entry);
+
       // 注入resolveId，保证第一个执行，不会被其他插件阶段
       /* 虽然vite不建议在这里调整插件，但是没有强行限制
          1. 只是收集引入和真实路径的关系，不会影响其他插件运行
@@ -71,62 +67,69 @@ export function vitePluginDepSpy(
       if (process.env[DEP_SPY_SUB_START]) {
         return;
       }
+      // 收集模块的导出使用以及移除情况
+      const importIdToExports = getImportIdToExports(bundle as OutputBundle);
+      // 构造获取模块关键信息的函数
+      const getModuleInfo: GetModuleInfo = (importId) => {
+        const { importedIds, dynamicallyImportedIds } =
+          this.getModuleInfo(importId) || {};
+        const { removedExports = [], renderedExports = [] } =
+          importIdToExports.get(importId) || {};
+        return {
+          importedIds: [...(importedIds || [])],
+          dynamicallyImportedIds: [...(dynamicallyImportedIds || [])],
+          removedExports,
+          renderedExports,
+        };
+      };
       // 绝对路径=>受到影响的导出 之间的映射
-      const allExportEffected: Map<string, ExportEffectedNode> =
-        await getAllExportEffected.call(this, options, sourceToImportIdMap);
-      // allExportEffected.forEach((key, value) => {
-      //   console.log(key, value, "\n");
-      // });
-      globalBundle.allExportEffected = allExportEffected;
-      // 记录bundle获取实际被打包的模块以及真实导出和被treeshaking的导出
-      globalBundle.resolveOriginModuleByBundle((originModules) => {
-        // 产物列表（包含静态资源和代码模块）
-        const distLists = Object.values(bundle);
-        distLists.forEach((dist) => {
-          // 只处理代码块
-          if (dist.type === "chunk") {
-            // 改分块代码由哪些引入模块构成
-            Object.entries(dist.modules || {}).forEach(([id, data]) => {
-              // 需引入代码直接依赖的三方包，但排出三方包的后续依赖
-              if (
-                globalBundle.allExportEffected.has(id) ||
-                !idInExternals(id)
-              ) {
-                originModules.set(id, {
-                  removedExports: data.removedExports,
-                  renderedExports: data.renderedExports,
-                });
-              }
-            });
-          }
-        });
-      });
+
       // 生成生成依赖树
-      const moduleGraph = globalBundle.generateModuleGraph(
-        this.getModuleInfo as unknown as GetModuleInfo,
+      const globalBundle = new Bundle(
+        options,
+        sourceToImportIdMap,
+        getModuleInfo,
       );
-      /** 根据导入导出关系构建模块依赖图（根据上述设置的信息进行构建） */
-      moduleGraph.buildGraph();
-      /** 分析并标记循环依赖 */
-      moduleGraph.analysisCircleModule(options.entry);
+      const moduleGraph = await globalBundle.generateModuleGraph();
+
       /** 生成铺平的树 */
       const flatTree = moduleGraph.generateTiledTreeByRootId();
-      const entryIdAndExportToFileNames = Array.from(
-        moduleGraph.entryIdAndExportToFileNames.entries() || [],
-      ).map(([key, value]) => {
-        return {
-          [key]: Array.from(value),
-        };
-      });
+      // const entryIdAndExportToFileNames = Array.from(
+      //   moduleGraph.entryIdAndExportToFileNames.entries() || [],
+      // ).map(([key, value]) => {
+      //   return {
+      //     [key]: Array.from(value),
+      //   };
+      // });
       // 分块发送数据给服务器
       await sendDataByChunk(flatTree, "/collectBundle");
-      await sendDataByChunk(
-        entryIdAndExportToFileNames,
-        "/collectEntryIdAndExportToFileNames",
-      );
+      // await sendDataByChunk(
+      //   entryIdAndExportToFileNames,
+      //   "/collectEntryIdAndExportToFileNames",
+      // );
       const jsonName = "moduleTree.json";
       const jsonPath = path.join(process.cwd(), jsonName);
       writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
     },
   };
+}
+
+function getImportIdToExports(bundle: OutputBundle) {
+  const importIdToExports = new Map<
+    string,
+    { removedExports: string[]; renderedExports: string[] }
+  >();
+  Object.values(bundle).forEach((dist) => {
+    // 只处理代码块
+    if (dist.type === "chunk") {
+      // 改分块代码由哪些引入模块构成
+      Object.entries(dist.modules || {}).forEach(([id, renderedModule]) => {
+        importIdToExports.set(id, {
+          removedExports: renderedModule?.removedExports || [],
+          renderedExports: renderedModule?.renderedExports || [],
+        });
+      });
+    }
+  });
+  return importIdToExports;
 }

@@ -20,3 +20,7 @@ export const HOST_MAX_FETCH_NUMBER = 6;
 export const DEP_SPY_START = "DEP_SPY_START";
 // 是否由vite子插件运行时标记，避免主插件循环使用
 export const DEP_SPY_SUB_START = "DEP_SPY_SUB_START";
+// 是否由Vite进行构建
+export const DEP_SPY_VITE_BUILD = "DEP_SPY_VITE_BUILD";
+// 是否由Webpack进行构建
+export const DEP_SPY_WEBPACK_BUILD = "DEP_SPY_WEBPACK_BUILD";

@@ -1,7 +1,14 @@
-import { ExportEffectedNodeSerializable, Values } from "../type";
-import { ExportEffectedNode } from "./utils";
+import {
+  ExportEffectedNodeSerializable,
+  GetModuleInfo,
+  Values,
+  ModuleInfo,
+  PluginDepSpyConfig,
+} from "../type";
+import { ExportEffectedNode, SourceToImportId } from "./utils";
 import { getGitRootPath } from "./utils";
-import { GetModuleInfo, ModuleInfo } from "rollup";
+import getAllExportEffected from "./getAllExportEffected";
+import path from "path";
 
 export const externals = ["node_modules"];
 
@@ -29,7 +36,9 @@ interface ModuleTree {
   isImportChange: boolean;
   // 该文件的副作用是否有改动（只限于非js类型）
   isSideEffectChange: boolean;
+  // 该文件哪些导出没用被使用
   removedExports: string[];
+  // 该文件哪些导出被使用
   renderedExports: string[];
   // 该文件的哪些导出有改动
   exportEffectedNamesToReasons: ExportEffectedNodeSerializable["exportEffectedNamesToReasons"];
@@ -39,54 +48,46 @@ interface ModuleTree {
 
 class Module {
   id: string;
-  /** key的导入者value */
-  importers: Module[] = [];
-  dynamicImporters: Module[] = [];
-  /** key导入value */
   importedIds: Module[] = [];
   dynamicallyImportedIds: Module[] = [];
-  removedExports: string[] = [];
-  renderedExports: string[] = [];
   circleModules = new Map<string, Module[]>();
-  constructor(id: string) {
+  constructor(
+    id: string,
+    public renderedExports: string[] = [],
+    public removedExports: string[] = [],
+  ) {
     this.id = id;
   }
 }
 
 // 构建模块依赖以及相关信息
 class ModuleGraph {
+  // 嵌套的树图
   graph = new Map<string, Module>();
-  /** key的导入者value */
-  importers = new Map<string, readonly string[]>();
-  dynamicImporters = new Map<string, readonly string[]>();
-  /** key导入value */
-  importedIds = new Map<string, readonly string[]>();
-  dynamicallyImportedIds = new Map<string, readonly string[]>();
-
-  bundle: Bundle;
-  entryId: string;
+  // 模块对应的静态引入
+  importedIds = new Map<string, string[]>();
+  // 模块对应的动态引入
+  dynamicallyImportedIds = new Map<string, string[]>();
+  // 项目的根节点（git的根目录）
   rootId: string;
+  // 铺平的树
   tiledTree: ModuleTree[] = [];
   private _moduleIds = new Map<string, number>();
   /**文件id+导出名 to 导入文件名列表 */
   entryIdAndExportToFileNames = new Map<string, Set<string>>();
   constructor(
-    bundle: Bundle,
-    entryId: string,
-    allModules: Map<string, ModuleInfo | null>,
+    public entryId: string,
+    public allExportEffected: Map<string, ExportEffectedNode>,
+    public allModules = new Map<string, ModuleInfo | null>(),
   ) {
-    this.bundle = bundle;
     this.rootId = getGitRootPath();
-    this.entryId = entryId;
-    allModules.forEach((info, id) => {
-      this.graph.set(id, new Module(id));
-      this.importers.set(id, info?.importers || []);
-      this.importedIds.set(id, info?.importedIds || []);
-      this.dynamicImporters.set(id, info?.dynamicImporters || []);
-      this.dynamicallyImportedIds.set(
-        info?.id,
-        info?.dynamicallyImportedIds || [],
+    this.allModules.forEach((info, id) => {
+      this.graph.set(
+        id,
+        new Module(id, info.renderedExports, info.removedExports),
       );
+      this.importedIds.set(id, info.importedIds);
+      this.dynamicallyImportedIds.set(id, info.dynamicallyImportedIds);
     });
   }
   /** 是否有重复模块 */
@@ -130,28 +131,6 @@ class ModuleGraph {
             return this.graph.get(item);
           })
           .filter(Boolean);
-      }
-      if (this.importers.has(id)) {
-        const importers = this.importers.get(id);
-        module.importers = importers
-          .map((item) => {
-            return this.graph.get(item);
-          })
-          .filter(Boolean);
-      }
-      if (this.dynamicImporters.has(id)) {
-        const dynamicImporters = this.dynamicImporters.get(id);
-        module.dynamicImporters = dynamicImporters
-          .map((item) => {
-            return this.graph.get(item);
-          })
-          .filter(Boolean);
-      }
-      if (this.bundle.originModules.has(id)) {
-        module.removedExports =
-          this.bundle.originModules.get(id).removedExports;
-        module.renderedExports =
-          this.bundle.originModules.get(id).renderedExports;
       }
     });
   }
@@ -248,6 +227,7 @@ class ModuleGraph {
   /**初始化树节点 */
   initTreeNodeData(entryId: string, parent: ModuleTree) {
     let id = entryId;
+    // id生成逻辑，出现一次+1
     if (this._moduleIds.has(entryId)) {
       const newValue = this._moduleIds.get(entryId) + 1;
       this._moduleIds.set(entryId, newValue);
@@ -256,8 +236,10 @@ class ModuleGraph {
       this._moduleIds.set(entryId, 1);
       id = `1`;
     }
-    const nameArr = entryId.split("/");
-    const exportEffect = this.bundle.allExportEffected
+    // 兼容win和mac的路径展示
+    const nameArr = path.normalize(entryId).split(path.sep);
+    // 获取该节点的exportEffect
+    const exportEffect = this.allExportEffected
       .get(entryId)
       ?.getSerializableNode();
 
@@ -344,6 +326,7 @@ class ModuleGraph {
     }
     return null;
   }
+  /** 序列化嵌套的树结构 */
   stringifyTreeByRootId(entryId: string = this.entryId) {
     if (this.graph.has(entryId)) {
       const rootTree = this.transform(entryId);
@@ -354,41 +337,43 @@ class ModuleGraph {
 }
 // 整合vite的打包后的整体信息
 export class Bundle {
-  /** 项目入口 */
-  entry: string;
   /** 模块图 */
   moduleGraph: ModuleGraph;
-  /** 实际打包模块 */
-  originModules = new Map<
-    string,
-    {
-      removedExports: string[];
-      renderedExports: string[];
-    }
-  >();
+
   /** 该项目所有的importId */
   allModules = new Map<string, ModuleInfo | null>();
-
-  // options: PluginConfig;
+  // 所有的受到影响的导出详情
   allExportEffected: Map<string, ExportEffectedNode>;
+  constructor(
+    public options: PluginDepSpyConfig,
+    public sourceToImportIdMap: SourceToImportId,
+    private getModuleInfo: GetModuleInfo,
+  ) {}
 
-  constructor(entry: string) {
-    this.entry = entry;
-  }
-
-  /** 获取实际被打包的模块 */
-  resolveOriginModuleByBundle(fn: (originModules: Map<string, any>) => void) {
-    fn(this.originModules);
-  }
   /** 从项目入口收集项目的全部的importId */
-  generateModuleGraph(getModuleInfo: GetModuleInfo) {
-    const allModules = this.collectAllModules(this.entry, getModuleInfo);
-    this.moduleGraph = new ModuleGraph(this, this.entry, allModules);
+  async generateModuleGraph() {
+    this.allExportEffected = await getAllExportEffected(
+      this.options,
+      this.sourceToImportIdMap,
+      this.getModuleInfo,
+    );
+    // 收集所有的模块
+    const allModules = this.collectAllModules(this.options.entry);
+    // 构建依赖树
+    this.moduleGraph = new ModuleGraph(
+      this.options.entry,
+      this.allExportEffected,
+      allModules,
+    );
+    /** 根据导入导出关系构建模块依赖图（根据上述设置的信息进行构建） */
+    this.moduleGraph.buildGraph();
+    /** 分析并标记循环依赖 */
+    this.moduleGraph.analysisCircleModule();
     return this.moduleGraph;
   }
   // 搜集项目所有的引入模块的信息，包括动态引入
-  private collectAllModules(importId: string, getModuleInfo: GetModuleInfo) {
-    const info = getModuleInfo(importId);
+  private collectAllModules(importId: string) {
+    const info = this.getModuleInfo(importId);
     this.allModules.set(importId, info);
     [
       ...(info?.importedIds || []),
@@ -407,7 +392,7 @@ export class Bundle {
         return;
       }
       // 递归搜集子importId
-      this.collectAllModules(id, getModuleInfo);
+      this.collectAllModules(id);
     });
     return this.allModules;
   }

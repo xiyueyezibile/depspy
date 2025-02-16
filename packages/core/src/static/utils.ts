@@ -10,9 +10,9 @@ import { ExportEffectedNodeSerializable } from "../type";
 // 源码路径和绝对路径的互相映射
 export class SourceToImportId {
   // 引用者绝对路径//相对=>绝对路径的映射，ps: {"/user/code/b.js//./a":"/user/code/a.js"}
-  private sourceToImportIdMap: Map<string, string>;
+  sourceToImportIdMap: Map<string, string>;
   // 绝对路径<=>裸导入的映射，ps: {lodash:"/user/code/lodash/index.js"}
-  private bareImportToImportIdMap: Map<string, string>;
+  bareImportToImportIdMap: Map<string, string>;
   constructor() {
     this.sourceToImportIdMap = new Map();
     this.bareImportToImportIdMap = new Map();
@@ -142,8 +142,11 @@ export class ExportEffectedNode {
 
 // 规范化vite插件中的id
 export function normalizeIdToFilePath(id: string) {
-  const pathWithoutQuery = id.split("?")[0];
-  return path.normalize(pathWithoutQuery).replace(/\x00/g, "");
+  if (id) {
+    const pathWithoutQuery = id.split("?")[0];
+    return pathWithoutQuery.replace(/\x00/g, "");
+  }
+  return id;
 }
 
 // 通过字符串获取hash值

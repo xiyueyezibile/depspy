@@ -11,9 +11,10 @@ import {
   isPathNeedFilter,
   ExportEffectedNode,
 } from "./utils";
-import { PluginContext } from "rollup";
 import { getTreeShakingDetail as _getTreeShakingDetail } from "./getTreeShakingDetail";
-import { VitePluginDepSpyConfig } from "./vitePluginDepSpy";
+import { ModuleInfo, PluginDepSpyConfig } from "../type";
+import { DEP_SPY_VITE_BUILD } from "../constant";
+import { getTreeShakingDetailFromAst } from "./getTrerShakingFromAst";
 
 // 只处理包含JS逻辑的文件类型
 const targetExt = new Set<string>([
@@ -30,47 +31,52 @@ const importIdToExportEffected: Map<string, ExportEffectedNode> = new Map();
 // 记录已经进入的处理队列的Promise
 const importIdToExportEffectedPromise: Map<
   string,
-  Promise<Map<string, Set<string>>>
+  Promise<Map<string, ExportEffectedNode>>
 > = new Map();
 
 // 获取指定导出真正依赖的源码和真正依赖的引入（复用vite的treeshaking规范）(缓存化)
-const getTreeShakingDetail = cacheReturn(_getTreeShakingDetail, (options) => {
-  // 以参数作为唯一key进行缓存
-  return getHashFromString(
-    Object.values(options).reduce((pre, cur) => pre + cur, ""),
-  );
-});
+const getTreeShakingDetail = cacheReturn(
+  process.env[DEP_SPY_VITE_BUILD]
+    ? _getTreeShakingDetail
+    : getTreeShakingDetailFromAst,
+  (options) => {
+    // 以参数作为唯一key进行缓存
+    return getHashFromString(
+      Object.values(options).reduce((pre, cur) => pre + cur, ""),
+    );
+  },
+);
 // getAllExportEffect的包装层，避免外层因为本身的递归参数传入不必要的参数
 export default async function getAllExportEffect(
-  // 必须在vite的hook上下文中调用
-  this: PluginContext,
   // 入口绝对地址
-  options: VitePluginDepSpyConfig,
+  options: PluginDepSpyConfig,
   // 源码引入到绝对路径的映射
   sourceToImportIdMap: SourceToImportId,
+  // 获取moduleInfo的函数
+  getModuleInfo: (importId: string) => ModuleInfo,
 ) {
   const { entry, ignores = [] } = options;
-  return await _getAllExportEffect.call(
-    this,
+  return await _getAllExportEffect(
     entry,
     ignores,
     new Set([options.entry]),
     sourceToImportIdMap,
+    getModuleInfo,
   );
 }
 
 // 获取代码中有哪些导出收到了改动的影响（直接或间接）
 async function _getAllExportEffect(
-  // 必须在vite的hook上下文中调用
-  this: PluginContext,
   // 入口绝对地址
   entry: string,
   // 忽略的文件
-  ignores: VitePluginDepSpyConfig["ignores"],
+  ignores: PluginDepSpyConfig["ignores"],
   // 当前节点经过的树路径
   paths: Set<string>,
   // 源码引入到绝对路径的映射
   sourceToImportIdMap: SourceToImportId,
+  // 获取moduleInfo的函数
+  getModuleInfo: (importId: string) => ModuleInfo,
 ) {
   // 进入节点记录路径
   paths.add(entry);
@@ -103,9 +109,9 @@ async function _getAllExportEffect(
     return importIdToExportEffected;
   }
   // 利用vite插件上下文的方法获取当前文件的信息
-  const currentInfo = this.getModuleInfo(entry);
+  const currentInfo = getModuleInfo(entry);
   // 保证该文件的import的影响已经计算完成
-  const importDepPromise: Promise<Map<string, Set<string>>>[] = [];
+  const importDepPromise: Promise<Map<string, ExportEffectedNode>>[] = [];
   // 该文件引入的所有依赖（静态引入 + 动态引入）
   const allImportIds = [
     ...(currentInfo?.importedIds || []),
@@ -121,12 +127,12 @@ async function _getAllExportEffect(
       importDepPromise.push(importIdToExportEffectedPromise.get(importedId));
       return;
     }
-    const promise = _getAllExportEffect.call(
-      this,
+    const promise = _getAllExportEffect(
       importedId,
       ignores,
       new Set([...paths, importedId]),
       sourceToImportIdMap,
+      getModuleInfo,
     );
     importIdToExportEffectedPromise.set(importedId, promise);
     importDepPromise.push(promise);
@@ -138,11 +144,11 @@ async function _getAllExportEffect(
   const exportChanges: ExportEffectedNode = new ExportEffectedNode();
   const exportEffectPromise: Promise<void>[] = [];
   // 遍历当前文件的导出，判断各个导出是否有变动
-  if (currentInfo?.exports.length) {
-    currentInfo?.exports?.forEach((exportName: string) => {
+  if (currentInfo?.renderedExports.length) {
+    currentInfo?.renderedExports?.forEach((exportName: string) => {
       const curTreeShakingCodePromise = getTreeShakingDetail({
         entry,
-        code: isCommonJs ? currentInfo.code : curCode,
+        code: curCode,
         exportName,
       });
       const preTreeShakingCodePromise = getTreeShakingDetail({
@@ -197,6 +203,7 @@ async function _getAllExportEffect(
             });
           }
         });
+
         // 该导出依赖的动态引入是否变动
         cur.dynamicallySource.forEach((source) => {
           // 动态引入文件的绝对路径
