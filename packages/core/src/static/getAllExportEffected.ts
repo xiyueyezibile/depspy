@@ -81,6 +81,7 @@ async function _getAllExportEffect(
   getModuleInfo: (importId: string) => ModuleInfo,
 ) {
   // 进入节点记录路径
+  console.log(entry);
   paths.add(entry);
   // 计算过该文件哪些导出受到了影响，直接返回
   if (importIdToExportEffected.has(entry)) {

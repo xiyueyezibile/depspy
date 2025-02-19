@@ -1,7 +1,7 @@
 import cac from "cac";
 import ora from "ora";
 import { blue, green, yellow, red } from "chalk";
-import { generateGraph, DEP_SPY_START } from "@dep-spy/core";
+import { generateGraph, DEP_SPY_START,DEP_SPY_INJECT_MODE } from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
 import {
@@ -74,9 +74,12 @@ cli
 
 // 源码依赖
 cli
-  .command("static [command]", "解析项目源码依赖")
+  .command("static [command]", "解析项目源码依DEP_SPY_INJECT_MODE赖")
   .option("--command <command>", "项目的构建命令", {
     type: ["string"],
+  })
+  .option("--inject", "是否将数据注入html", {
+    type: ["boolean"],
   })
   .action(async (command, options) => {
     // 获取最终的配置文件
@@ -96,6 +99,10 @@ cli
 
     // 设置环境变量，保证插件只能通过ds命令运行
     process.env[DEP_SPY_START] = "true";
+    // 如果用户选择inject模式，需要设置环境变量
+    if (options.inject) {
+      process.env[DEP_SPY_INJECT_MODE] = "true";
+    }
     // 启动服务器，准备接收插件数据
     createStaticServer();
     exec(options.command, { cwd: process.cwd() }, (error, std) => {

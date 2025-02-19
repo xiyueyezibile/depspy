@@ -1,8 +1,15 @@
 import express, { Express } from "express";
 import { bufferHandler, errorHandler } from "../utils";
 import { jsonsToBuffer } from "@dep-spy/utils";
+import { staticPath } from "@dep-spy/view";
+import path from "path";
+import { MODE } from "../constants";
+import fs from "fs";
+
+// inject模式下的根目录
+const root = path.join(staticPath, MODE.INJECT);
 /** 平铺树 buffer状态 */
-const bufferArr = [];
+const bufferArr:Buffer[] = [];
 
 const entryIdAndExportToFileNames = new Map<string, string[]>();
 
@@ -11,12 +18,20 @@ export function createHttp(app: Express) {
   // 收集 bundle 图
   app.post<Buffer>("/collectBundle", (req, res) => {
     try {
-      req.on("data", (chunk) => {
+      req.on("data", (chunk:Buffer) => {
         bufferArr.push(chunk);
       });
-      res.send({
-        message: "success",
-      });
+      req.on("end", () => {
+        res.send({
+          message: "success",
+        });
+        // 最后一个chunk再将数据注入到html
+        if (req.query?.end) {
+          // 设置数组到html
+          injectData(JSON.stringify(parseNodeBuffer(Buffer.concat(bufferArr).buffer)));
+        }
+
+      })
     } catch (error) {
       errorHandler(res, error);
     }
@@ -80,4 +95,41 @@ export function createHttp(app: Express) {
       jsonsToBuffer([JSON.stringify(Array.from(effectedLists))]),
     );
   });
+}
+
+function injectData(data: string) {
+  const indexPath = path.join(root, "index.html");
+  const htmlString = fs.readFileSync(indexPath, "utf-8");
+  const injectString = `<script>window.__depSpyStaticTreeLeaves__=${data}</script>`;
+  const newHtmlString = htmlString.replace('<head>', `<head>${injectString}`);
+  fs.writeFileSync(indexPath, newHtmlString);
+}
+export function parseNodeBuffer(buffer) {
+  if (!buffer) {
+    throw new Error("buffer is empty");
+  }
+  const nodes = [];
+  let offset = 0;
+
+  while (offset < buffer.byteLength) {
+    // 读取数据块的大小（前4个字节）
+    const sizeView = new DataView(buffer, offset, 4);
+    const nodeSize = sizeView.getInt32(0, true); // Little Endian
+    offset += 4;
+
+    // 读取实际的数据
+    const nodeBuffer = new Uint8Array(buffer, offset, nodeSize);
+    offset += nodeSize;
+
+    // 将数据转换为字符串并解析为对象
+    const nodeJson = new TextDecoder().decode(nodeBuffer);
+    const node = JSON.parse(nodeJson, (key, value) => {
+      if (key === "childrenNumber" && (value === "Infinity" || value === null))
+        return Infinity;
+      return value;
+    });
+    nodes.push(node);
+  }
+
+  return nodes;
 }

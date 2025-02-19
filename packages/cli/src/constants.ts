@@ -16,4 +16,5 @@ export const defaultConfig = {
 export const enum MODE {
   ONLINE = "online",
   OFFLINE = "vite",
+  INJECT = "inject",
 }

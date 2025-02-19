@@ -6,6 +6,7 @@ import { readFileSync } from "fs";
 import { jsonsToBuffer } from "@dep-spy/utils";
 import http from "http";
 import { ExportEffectedNodeSerializable } from "../type";
+import { DEP_SPY_INJECT_MODE } from "../constant";
 
 // 源码路径和绝对路径的互相映射
 export class SourceToImportId {
@@ -264,12 +265,15 @@ export function getGitRootPath() {
 export async function sendDataByChunk(data: any[], path: string) {
   const chunkLen = 80;
   // 分块发送数据给服务器
+  const count = Math.ceil(data?.length / chunkLen);
   try {
     await Promise.all(
-      new Array(Math.ceil(data?.length / chunkLen)).fill(0).map((_, i) => {
+      new Array(count).fill(0).map((_, i) => {
+        // 最后一个分块携带标记，表示发送完毕
+        const pathWithQuery = i+1 < count ? path : `${path}?end=${count}`;
         return postServerGraph(
           data.slice(i * chunkLen, (i + 1) * chunkLen),
-          path,
+          pathWithQuery,
         );
       }),
     );
@@ -302,7 +306,14 @@ export function postServerGraph(data: any[], path: string) {
     req.on("error", (error) => {
       reject(error);
     });
-    req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
+    // 如果是注入模式，直接发送字符串
+    if(process[DEP_SPY_INJECT_MODE]){
+      req.write(data.map((item) => JSON.stringify(item)));
+    }else{
+      req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
+    }
+
+    
     req.end();
   });
 }

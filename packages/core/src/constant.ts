@@ -24,3 +24,5 @@ export const DEP_SPY_SUB_START = "DEP_SPY_SUB_START";
 export const DEP_SPY_VITE_BUILD = "DEP_SPY_VITE_BUILD";
 // 是否由Webpack进行构建
 export const DEP_SPY_WEBPACK_BUILD = "DEP_SPY_WEBPACK_BUILD";
+// 是否是inject模式
+export const DEP_SPY_INJECT_MODE = "DEP_SPY_INJECT_MODE";
