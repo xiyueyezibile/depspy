@@ -276,22 +276,6 @@ export default function StaticTree() {
       graphRef.current.updateItem(item, {
         collapsed: !flag,
       });
-      if (flag) {
-        //展开路径上的所有节点
-        const ids = model.path as string[];
-        const updatedIds = new Set<string>();
-        ids.forEach((id) => {
-          if (!updatedIds.has(id)) {
-            const node = graphRef.current.findById(id) as G6.Node;
-            if (node) {
-              graphRef.current.updateItem(node, {
-                collapsed: false,
-              });
-              updatedIds.add(id);
-            }
-          }
-        });
-      }
       graphRef.current.changeData(cloneData);
       circleMap.forEach((k, v) => {
         if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
@@ -320,7 +304,8 @@ export default function StaticTree() {
         //如果图里能找到节点，则展开节点并等待渲染完成
         expandNode(rawItem, true);
         // 等待一帧确保渲染完成
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        // await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       } else {
         // 如果找不到节点，则遍历数据查找路径，展开路径节点
         let path: string[] = [];
@@ -340,7 +325,8 @@ export default function StaticTree() {
               if (rawPathItem) {
                 expandNode(rawPathItem, true);
                 // 每个路径节点展开后都等待渲染
-                await new Promise((resolve) => requestAnimationFrame(resolve));
+                // await new Promise((resolve) => requestAnimationFrame(resolve));
+                await new Promise((resolve) => setTimeout(resolve, 0));
               }
               updatedIds.add(pid);
             }
