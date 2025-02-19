@@ -2,6 +2,7 @@ import { Node } from "~/types";
 import { FunctionPool, FunctionWorker } from "@dep-spy/utils";
 import { parseNodeBuffer, generateTree } from "@/utils/parseBufferToTree.ts";
 import { stringifyObjToParams } from "@/utils/stringifyObjToParams.ts";
+import { INJECT_MODE } from "../../constant";
 
 const baseUrl = "http://localhost:2023";
 const staticBaseUrl = "http://localhost:2025";
@@ -126,6 +127,9 @@ export const getNodeByPath = async (query: {
 // };
 
 export const getStaticGraph = async () => {
+  if(import.meta.env.MODE === INJECT_MODE){
+    return window["__depSpyStaticTreeLeaves__"];
+  }
   const res = await fetch(`${staticBaseUrl}/getStaticTree`, {
     method: "GET",
   });

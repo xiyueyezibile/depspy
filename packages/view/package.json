@@ -18,10 +18,11 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:vite && npm run build:tsup",
+    "build": "npm run build:vite && npm run build:tsup && npm run build:inject",
     "build:vite": "vite build --mode offline",
     "build:tsup": "tsup",
     "build:online": "vite build --mode online",
+    "build:inject": "vite build --mode inject",
     "tsup-build": "tsup --watch",
     "vite-build": "vite build --watch",
     "vite-static": "cross-env VITE_STATIC=static vite build",
@@ -33,10 +34,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@dep-spy/cli": "link:../cli",
     "@iconify-json/carbon": "^1.1.20",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@dep-spy/cli": "link:../cli",
     "@types/react": "^18.2.18",
     "@types/react-dom": "^18.2.7",
     "@unocss/preset-attributify": "^0.55.2",
@@ -45,7 +46,8 @@
     "rollup-plugin-node-globals": "^1.4.0",
     "sass": "^1.65.1",
     "tsup": "^7.1.0",
-    "unocss": "^0.55.2"
+    "unocss": "^0.55.2",
+    "vite-plugin-singlefile": "^2.1.0"
   },
   "dependencies": {
     "@antv/g6": "^4.8.24",
