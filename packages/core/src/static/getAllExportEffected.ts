@@ -45,7 +45,6 @@ export default async function getAllExportEffect(
   // 获取moduleInfo的函数
   getModuleInfo: (importId: string) => ModuleInfo,
 ) {
-  const { entry, ignores = [] } = options;
   // 函数执行时才进行赋值，避免环境变量为空
   getTreeShakingDetail = cacheReturn(
     process.env[DEP_SPY_VITE_BUILD]
@@ -59,8 +58,7 @@ export default async function getAllExportEffect(
     },
   );
   return await _getAllExportEffect(
-    entry,
-    ignores,
+    options,
     new Set([options.entry]),
     sourceToImportIdMap,
     getModuleInfo,
@@ -69,10 +67,8 @@ export default async function getAllExportEffect(
 
 // 获取代码中有哪些导出收到了改动的影响（直接或间接）
 async function _getAllExportEffect(
-  // 入口绝对地址
-  entry: string,
-  // 忽略的文件
-  ignores: PluginDepSpyConfig["ignores"],
+  // 插件配置
+  options: PluginDepSpyConfig,
   // 当前节点经过的树路径
   paths: Set<string>,
   // 源码引入到绝对路径的映射
@@ -80,8 +76,8 @@ async function _getAllExportEffect(
   // 获取moduleInfo的函数
   getModuleInfo: (importId: string) => ModuleInfo,
 ) {
-  // 进入节点记录路径
-  console.log(entry);
+  const { entry, ignores = [], ignorePlugins = [], commitHash = "HEAD" } = options;
+  // 进入节点记录路径;
   paths.add(entry);
   // 计算过该文件哪些导出受到了影响，直接返回
   if (importIdToExportEffected.has(entry)) {
@@ -131,8 +127,10 @@ async function _getAllExportEffect(
       return;
     }
     const promise = _getAllExportEffect(
-      importedId,
-      ignores,
+      {
+        ...options,
+        entry: importedId
+      },
       new Set([...paths, importedId]),
       sourceToImportIdMap,
       getModuleInfo,
@@ -142,7 +140,7 @@ async function _getAllExportEffect(
   });
   // 确保改文件的所有依赖都已经解析完成
   await Promise.all(importDepPromise);
-  const preCode = getFileContentAtCommit(entry, "HEAD");
+  const preCode = getFileContentAtCommit(entry, commitHash);
   const curCode = readFileSyncSafe(entry);
   const exportChanges: ExportEffectedNode = new ExportEffectedNode();
   const exportEffectPromise: Promise<void>[] = [];
@@ -153,11 +151,13 @@ async function _getAllExportEffect(
         entry,
         code: curCode,
         exportName,
+        ignorePlugins,
       });
       const preTreeShakingCodePromise = getTreeShakingDetail({
         entry,
         code: preCode,
         exportName,
+        ignorePlugins,
       });
       const mergePromise = Promise.all([
         curTreeShakingCodePromise,

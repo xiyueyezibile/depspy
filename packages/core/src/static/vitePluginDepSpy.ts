@@ -1,5 +1,5 @@
 import path from "path";
-import { sendDataByChunk, SourceToImportId } from "./utils";
+import { mergeOptions, sendDataByChunk, SourceToImportId } from "./utils";
 import { Bundle } from "./staticModule";
 import { normalizePath, type PluginOption } from "vite";
 import {
@@ -22,10 +22,12 @@ export function vitePluginDepSpy(
   if (process.env[DEP_SPY_SUB_START]) {
     return false;
   }
+  // 标记是由vite构建
   process.env[DEP_SPY_VITE_BUILD] = "true";
-
   // 源码路径和绝对路径的互相映射
   const sourceToImportIdMap = new SourceToImportId();
+  // 合并环境配置和用户配置
+  options = mergeOptions(options);
 
   return {
     name: "vite-plugin-dep-spy",

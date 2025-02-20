@@ -10,6 +10,8 @@ interface GetTreeShakingDetailOptions {
   code: string;
   // 指定导出的名称，例如： default ｜ * ｜ getName
   exportName: string;
+  // 忽略的插件
+  ignorePlugins?:string[],
 }
 interface GetTreeShakingDetailResult {
   // treeshaking后的代码
@@ -34,6 +36,7 @@ export async function getTreeShakingDetail(
   options: GetTreeShakingDetailOptions,
 ): Promise<GetTreeShakingDetailResult> {
   const { code, exportName, entry } = options;
+  const ignorePlugins = new Set(options.ignorePlugins || []);
   // 当前文件的后缀
   const ext = path.extname(normalizeIdToFilePath(entry));
   // 计算过该文件哪些导出受到了影响，直接返回
@@ -102,9 +105,11 @@ export async function getTreeShakingDetail(
                   };
                 },
               });
+              // @ts-ignore 过滤指定的插件
+              config.plugins = config.plugins.filter((plugin)=>!ignorePlugins.has(plugin?.["name"]))
             },
             config(config) {
-              // 兼容有分包的逻辑
+              // 兼容有分包的逻辑,删除分包
               if (Array.isArray(config?.build?.rollupOptions?.output)) {
                 config.build.rollupOptions.output.map((item) => {
                   delete item.manualChunks;

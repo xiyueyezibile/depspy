@@ -1,7 +1,7 @@
 import cac from "cac";
 import ora from "ora";
 import { blue, green, yellow, red } from "chalk";
-import { generateGraph, DEP_SPY_START,DEP_SPY_INJECT_MODE } from "@dep-spy/core";
+import { generateGraph, DEP_SPY_START,DEP_SPY_INJECT_MODE, DEP_SPY_COMMIT_HASH } from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
 import {
@@ -74,12 +74,15 @@ cli
 
 // 源码依赖
 cli
-  .command("static [command]", "解析项目源码依DEP_SPY_INJECT_MODE赖")
+  .command("static [command]", "解析项目源码依赖")
   .option("--command <command>", "项目的构建命令", {
     type: ["string"],
   })
   .option("--inject", "是否将数据注入html", {
     type: ["boolean"],
+  })
+  .option("--commitHash <commitHash>", "与当前版本对比的commit hash", {
+    type: ["string"],
   })
   .action(async (command, options) => {
     // 获取最终的配置文件
@@ -99,9 +102,12 @@ cli
 
     // 设置环境变量，保证插件只能通过ds命令运行
     process.env[DEP_SPY_START] = "true";
-    // 如果用户选择inject模式，需要设置环境变量
+    // 通过设置环境变量，传递用户配置
     if (options.inject) {
       process.env[DEP_SPY_INJECT_MODE] = "true";
+    }
+    if (options.commitHash) {
+      process.env[DEP_SPY_COMMIT_HASH] = options.commitHash;
     }
     // 启动服务器，准备接收插件数据
     createStaticServer();
@@ -117,6 +123,10 @@ cli
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
       // vite插件运行完毕，数据已经发送完毕，可以展示web页面
       outPutUrl();
+      // 注入模式不需要开发服务器，直接退出
+      if (options.inject) {
+        process.exit(0);
+      }
     });
   });
 

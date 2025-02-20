@@ -64,4 +64,8 @@ export interface PluginDepSpyConfig {
   entry?: string;
   // 忽略的文件路径，正则用test，字符串用includes
   ignores?: (string | RegExp)[];
+  // 对比版本的commit hash
+  commitHash?: string;
+  // 忽略的插件名字
+  ignorePlugins?:string[]
 }

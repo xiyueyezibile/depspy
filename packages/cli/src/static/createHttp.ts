@@ -1,24 +1,25 @@
 import express, { Express } from "express";
 import { bufferHandler, errorHandler } from "../utils";
-import { jsonsToBuffer } from "@dep-spy/utils";
+import { jsonsToBuffer, parseNodeBuffer } from "@dep-spy/utils";
 import { staticPath } from "@dep-spy/view";
 import path from "path";
 import { MODE } from "../constants";
 import fs from "fs";
+import { DEP_SPY_INJECT_MODE, DEP_SPY_WINDOW_VAR } from "@dep-spy/core";
 
 // inject模式下的根目录
 const root = path.join(staticPath, MODE.INJECT);
 /** 平铺树 buffer状态 */
-const bufferArr:Buffer[] = [];
+const bufferArr:Uint8Array[] = [];
 
 const entryIdAndExportToFileNames = new Map<string, string[]>();
 
 export function createHttp(app: Express) {
   app.use(express.json());
   // 收集 bundle 图
-  app.post<Buffer>("/collectBundle", (req, res) => {
+  app.post<Uint8Array>("/collectBundle", (req, res) => {
     try {
-      req.on("data", (chunk:Buffer) => {
+      req.on("data", (chunk:Uint8Array) => {
         bufferArr.push(chunk);
       });
       req.on("end", () => {
@@ -26,7 +27,8 @@ export function createHttp(app: Express) {
           message: "success",
         });
         // 最后一个chunk再将数据注入到html
-        if (req.query?.end) {
+        if (req.query?.end && process.env[DEP_SPY_INJECT_MODE]) {
+          console.log(111,process.env[DEP_SPY_INJECT_MODE])
           // 设置数组到html
           injectData(JSON.stringify(parseNodeBuffer(Buffer.concat(bufferArr).buffer)));
         }
@@ -45,9 +47,7 @@ export function createHttp(app: Express) {
         while (offset < arrayBuffer.byteLength) {
           const sizeView = new DataView(arrayBuffer, offset, 4);
           const nodeSize = sizeView.getInt32(0, true); // Little Endian
-
           offset += 4;
-
           const nodeBuffer = new Uint8Array(arrayBuffer, offset, nodeSize);
           offset += nodeSize;
           const nodeJson = new TextDecoder().decode(nodeBuffer);
@@ -97,39 +97,11 @@ export function createHttp(app: Express) {
   });
 }
 
+// 将数据注入到html
 function injectData(data: string) {
   const indexPath = path.join(root, "index.html");
   const htmlString = fs.readFileSync(indexPath, "utf-8");
-  const injectString = `<script>window.__depSpyStaticTreeLeaves__=${data}</script>`;
-  const newHtmlString = htmlString.replace('<head>', `<head>${injectString}`);
+  const injectString = `<script id="__DEP_SPY_STATIC_TREE__">window.${DEP_SPY_WINDOW_VAR}=${data}</script>`;
+  const newHtmlString = htmlString.replace(/<script id="__DEP_SPY_STATIC_TREE__">.*<\/script>/, injectString);
   fs.writeFileSync(indexPath, newHtmlString);
-}
-export function parseNodeBuffer(buffer) {
-  if (!buffer) {
-    throw new Error("buffer is empty");
-  }
-  const nodes = [];
-  let offset = 0;
-
-  while (offset < buffer.byteLength) {
-    // 读取数据块的大小（前4个字节）
-    const sizeView = new DataView(buffer, offset, 4);
-    const nodeSize = sizeView.getInt32(0, true); // Little Endian
-    offset += 4;
-
-    // 读取实际的数据
-    const nodeBuffer = new Uint8Array(buffer, offset, nodeSize);
-    offset += nodeSize;
-
-    // 将数据转换为字符串并解析为对象
-    const nodeJson = new TextDecoder().decode(nodeBuffer);
-    const node = JSON.parse(nodeJson, (key, value) => {
-      if (key === "childrenNumber" && (value === "Infinity" || value === null))
-        return Infinity;
-      return value;
-    });
-    nodes.push(node);
-  }
-
-  return nodes;
 }

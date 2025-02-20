@@ -26,3 +26,8 @@ export const DEP_SPY_VITE_BUILD = "DEP_SPY_VITE_BUILD";
 export const DEP_SPY_WEBPACK_BUILD = "DEP_SPY_WEBPACK_BUILD";
 // 是否是inject模式
 export const DEP_SPY_INJECT_MODE = "DEP_SPY_INJECT_MODE";
+// 用户配置的对比的commithash
+export const DEP_SPY_COMMIT_HASH = "DEP_SPY_COMMIT_HASH";
+// 代码依赖树挂载在window上的变量名
+export const DEP_SPY_WINDOW_VAR = "__DEP_SPY_STATIC_TREE__";
+

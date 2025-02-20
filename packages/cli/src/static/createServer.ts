@@ -16,7 +16,6 @@ export function createServer() {
   app.get("*", (_, res) => {
     res.sendFile(path.join(root, "index.html"));
   });
-
   app.listen(port);
 }
 export function outPutUrl() {
