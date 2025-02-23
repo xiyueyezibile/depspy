@@ -263,113 +263,87 @@ export default function StaticTree() {
 
   // 用于展开节点
   const expandNode = useCallback(
-    (item: G6.Node, flag: boolean) => {
+    (id: string, flag: boolean) => {
       if (!graphRef.current) return;
-      const model = item.getModel();
-      if (!model.collapsed) return;
-      const matrix = graphRef.current.getGroup().getMatrix();
+      return new Promise((resolve) => {
+        const matrix = graphRef.current.getGroup().getMatrix();
 
-      const zoom = graphRef.current.getZoom();
-      const offsetX = matrix[6] / zoom;
-      const offsetY = matrix[7] / zoom;
+        const zoom = graphRef.current.getZoom();
+        const offsetX = matrix[6] / zoom;
+        const offsetY = matrix[7] / zoom;
 
-      graphRef.current.updateItem(item, {
-        collapsed: !flag,
-      });
-      graphRef.current.changeData(cloneData);
-      circleMap.forEach((k, v) => {
-        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-          graphRef.current.addItem("edge", {
-            source: k,
-            target: v,
-            type: "circle-line",
+        const item = graphRef.current.findById(id) as G6.Node;
+        if (item) {
+          //如果直接在图里面找到到节点，并且节点是折叠状态，则展开该节点
+          const model = item.getModel();
+          if (!model.collapsed) return;
+          graphRef.current.updateItem(item, {
+            collapsed: !flag,
+          });
+        } else {
+          G6.Util.traverseTree(cloneData, (node) => {
+            if (node.id === id) {
+              node.path.forEach((path) => {
+                expandNode(path, true);
+              });
+            }
           });
         }
+        graphRef.current.changeData(cloneData);
+        circleMap.forEach((k, v) => {
+          if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+            graphRef.current.addItem("edge", {
+              source: k,
+              target: v,
+              type: "circle-line",
+            });
+          }
+        });
+        //保持在展开折叠后树节点位置不变
+        graphRef.current.translate(offsetX, offsetY);
+        graphRef.current.zoom(zoom);
+        graphRef.current.refresh();
+        refreshGitAndImportChangedNodes();
+        setTimeout(() => {
+          resolve(true);
+        }, 0);
       });
-      //保持在展开折叠后树节点位置不变
-      graphRef.current.translate(offsetX, offsetY);
-      graphRef.current.zoom(zoom);
-      graphRef.current.refresh();
-      refreshGitAndImportChangedNodes();
     },
     [graphRef, cloneData, circleMap],
   );
 
-  const expandNodeSequentially = useCallback(
-    async (id: string) => {
-      const rawItem = graphRef.current.findById(id) as G6.Node;
-
-      // 处理节点展开逻辑
-      if (rawItem) {
-        //如果图里能找到节点，则展开节点并等待渲染完成
-        expandNode(rawItem, true);
-        // 等待一帧确保渲染完成
-        // await new Promise((resolve) => requestAnimationFrame(resolve));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      } else {
-        // 如果找不到节点，则遍历数据查找路径，展开路径节点
-        let path: string[] = [];
-        G6.Util.traverseTree(cloneData, (node) => {
-          if (node.id === id) {
-            path = [...node.path];
-            return false;
-          }
-          return true;
-        });
-
-        const updatedIds = new Set<string>();
-        if (path.length) {
-          for (const pid of path) {
-            if (!updatedIds.has(pid)) {
-              const rawPathItem = graphRef.current.findById(pid) as G6.Node;
-              if (rawPathItem) {
-                expandNode(rawPathItem, true);
-                // 每个路径节点展开后都等待渲染
-                // await new Promise((resolve) => requestAnimationFrame(resolve));
-                await new Promise((resolve) => setTimeout(resolve, 0));
-              }
-              updatedIds.add(pid);
-            }
-          }
-        }
-      }
-
-      // 额外等待确保高亮效果渲染
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    },
-    [graphRef.current, expandNode, highlightedNodeIds],
-  );
-
   const highlightNodesSequentially = useCallback(async () => {
     for (const id of highlightedNodeIds) {
-      await expandNodeSequentially(id);
+      //展开逻辑
+      await expandNode(id, true);
     }
+
     for (const id of highlightedNodeIds) {
       // 处理高亮逻辑
       const item = graphRef.current.findById(id) as G6.Node;
-      if (!item) return;
+      if (item) {
+        const relatedEdges = item.getEdges() || [];
+        graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
+        graphRef.current.refreshItem(item);
 
-      const relatedEdges = item.getEdges() || [];
-      graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
-      graphRef.current.refreshItem(item);
-
-      relatedEdges.forEach((edge) => {
-        const {
-          _cfg: { currentShape },
-        } = edge;
-        if (currentShape === "custom-polyline") {
-          graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
-          graphRef.current.refreshItem(edge);
-        } else {
-          //判断当前节点是否是起点
-          if (edge.getSource().getModel().id === item.getModel().id) {
+        relatedEdges.forEach((edge) => {
+          const {
+            _cfg: { currentShape },
+          } = edge;
+          if (currentShape === "custom-polyline") {
             graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
             graphRef.current.refreshItem(edge);
+          } else {
+            //判断当前节点是否是起点
+            if (edge.getSource().getModel().id === item.getModel().id) {
+              graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
+              graphRef.current.refreshItem(edge);
+            }
           }
-        }
-      });
+        });
+      }
     }
-  }, [highlightedNodeIds, graphRef.current, expandNodeSequentially]);
+  }, [highlightedNodeIds, graphRef.current]);
 
   useEffect(() => {
     const newData = deepClone(staticRoot);

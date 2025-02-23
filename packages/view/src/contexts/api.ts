@@ -128,7 +128,7 @@ export const getNodeByPath = async (query: {
 // };
 
 export const getStaticGraph = async () => {
-  if(import.meta.env.MODE === INJECT_MODE){
+  if (import.meta.env.MODE === INJECT_MODE) {
     return window[DEP_SPY_WINDOW_VAR];
   }
   const res = await fetch(`${staticBaseUrl}/getStaticTree`, {
