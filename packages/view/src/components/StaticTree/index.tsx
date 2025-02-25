@@ -264,7 +264,10 @@ export default function StaticTree() {
   // 用于展开节点
   const expandNode = useCallback(
     (id: string, flag: boolean) => {
-      if (!graphRef.current) return;
+      if (!graphRef.current)
+        return new Promise((resolve) => {
+          resolve(1);
+        });
       return new Promise((resolve) => {
         const matrix = graphRef.current.getGroup().getMatrix();
 
@@ -276,7 +279,7 @@ export default function StaticTree() {
         if (item) {
           //如果直接在图里面找到到节点，并且节点是折叠状态，则展开该节点
           const model = item.getModel();
-          if (!model.collapsed) return;
+          if (!model.collapsed) resolve(1);
           graphRef.current.updateItem(item, {
             collapsed: !flag,
           });
@@ -284,6 +287,7 @@ export default function StaticTree() {
           G6.Util.traverseTree(cloneData, (node) => {
             if (node.id === id) {
               node.path.forEach((path) => {
+                //TODO: 建立一个id => node状态的映射，从而减少不必要的expand
                 expandNode(path, true);
               });
             }
