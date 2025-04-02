@@ -25,7 +25,7 @@ title: 快速开始
 将 DepSpy 安装到项目，使用 `PNPM`：
 
 ```bash
-$ pnpm add @dep-spy/cli -D
+$ pnpm add @tencent/dep-spy/cli -D
 ```
 
 之后你可以在 `npm` 脚本添加使用 `ds` 或者 `depspy` 脚本，以下是推荐配置脚本：
@@ -55,6 +55,6 @@ $ pnpm run ds --ui
 
 ![ui](https://cheerioinf-img.oss-cn-beijing.aliyuncs.com/img/image-20230828225639712%202.png)
 
-推荐使用上述方法，但也支持使用 `npx @dep-spy/cli` 来直接运行 DepSpy。
+推荐使用上述方法，但也支持使用 `npx @tencent/dep-spy/cli` 来直接运行 DepSpy。
 
 ### 线上查询

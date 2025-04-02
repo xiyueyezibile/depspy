@@ -1,15 +1,15 @@
 import path from "path";
 import { mergeOptions, sendDataByChunk, SourceToImportId } from "./utils";
-import { Bundle } from "./staticModule";
 import { normalizePath, type PluginOption } from "vite";
 import {
   DEP_SPY_START,
   DEP_SPY_SUB_START,
   DEP_SPY_VITE_BUILD,
 } from "../constant";
-import { writeFileSync } from "fs";
 import { OutputBundle } from "rollup";
 import { GetModuleInfo, PluginDepSpyConfig } from "../type";
+import getAllExportEffect from "./getAllExportEffected";
+import { StaticGraph } from "./staticGraph";
 
 export function vitePluginDepSpy(
   options: PluginDepSpyConfig = {},
@@ -73,8 +73,27 @@ export function vitePluginDepSpy(
       const importIdToExports = getImportIdToExports(bundle as OutputBundle);
       // 构造获取模块关键信息的函数
       const getModuleInfo: GetModuleInfo = (importId) => {
+        // 当前文件的后缀
+        const ext = path.extname(importId);
+        // 导入信息
         const { importedIds, dynamicallyImportedIds } =
           this.getModuleInfo(importId) || {};
+        // vue文件的特殊处理，跳过过程中的ts文件，相当于vue直接引入的依赖
+        if (ext === ".vue") {
+          // 导入信息
+          const { importedIds: ids, dynamicallyImportedIds: dynamicIds } =
+            this.getModuleInfo(importedIds[0]) || {};
+          // 导出信息
+          const { removedExports = [], renderedExports = [] } =
+            importIdToExports.get(importedIds[0]) || {};
+          return {
+            importedIds: [...(ids || [])],
+            dynamicallyImportedIds: [...(dynamicIds || [])],
+            removedExports,
+            renderedExports,
+          };
+        }
+        // 导出信息
         const { removedExports = [], renderedExports = [] } =
           importIdToExports.get(importId) || {};
         return {
@@ -84,34 +103,17 @@ export function vitePluginDepSpy(
           renderedExports,
         };
       };
-      // 绝对路径=>受到影响的导出 之间的映射
-
-      // 生成生成依赖树
-      const globalBundle = new Bundle(
+      // 生成全部模块的导出影响信息
+      const allExportEffected = await getAllExportEffect(
         options,
         sourceToImportIdMap,
         getModuleInfo,
       );
-      const moduleGraph = await globalBundle.generateModuleGraph();
-
-      /** 生成铺平的树 */
-      const flatTree = moduleGraph.generateTiledTreeByRootId();
-      // const entryIdAndExportToFileNames = Array.from(
-      //   moduleGraph.entryIdAndExportToFileNames.entries() || [],
-      // ).map(([key, value]) => {
-      //   return {
-      //     [key]: Array.from(value),
-      //   };
-      // });
+      // 生成依赖图
+      const staticGraph = new StaticGraph(options, allExportEffected);
+      const graph = staticGraph.generateGraph();
       // 分块发送数据给服务器
-      await sendDataByChunk(flatTree, "/collectBundle");
-      // await sendDataByChunk(
-      //   entryIdAndExportToFileNames,
-      //   "/collectEntryIdAndExportToFileNames",
-      // );
-      const jsonName = "moduleTree.json";
-      const jsonPath = path.join(process.cwd(), jsonName);
-      writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
+      await sendDataByChunk(Object.values(graph), "/collectBundle");
     },
   };
 }

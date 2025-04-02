@@ -35,12 +35,19 @@ export class SourceToImportId {
     }
     return this.sourceToImportIdMap.get(key);
   }
+  // 清空记录，避免内存泄漏
+  clear() {
+    this.sourceToImportIdMap.clear();
+    this.bareImportToImportIdMap.clear();
+  }
   // 构造不同的key
   private getKey(source: string, importer: string | undefined) {
     // 三方包路径/别名/绝对路径，直接以source为key
     if (this.isBareImport(source)) {
       return source;
     }
+    // 删除无用的参数
+    importer = normalizeIdToFilePath(importer);
     // 相对路径需要加上引用地址才能作为唯一id(以//为分隔符)
     return `${source}//${importer || ""}`;
   }
@@ -56,88 +63,93 @@ export class SourceToImportId {
 // 更方便的合并添加节点的影响
 export class ExportEffectedNode {
   // 受影响的导出以及对应影响原因，key:导出名称（例如：default ，* ，xx ），value: 影响原因
-  exportEffectedNamesToReasons: Map<
+  exportEffectedNamesToReasons: Record<
     string,
     {
       // 是否是因为本地代码变更导致的导出变更
       isNativeCodeChange?: boolean;
       // 是否是因为引入变更导致的导出变更，例如：{ "/user/code/a.ts": ["a","default"] }
       // 和下面的importEffectedNames类型一致，只不过只是针对某个导出的依赖引入
-      importEffectedNames: Map<string, Set<string>>;
+      importEffectedNames: Record<string, string[]>;
     }
-  >;
+  > = {};
   // 受影响的导入,例如：{ "/user/code/a.ts": ["a","b","default","*"] }
-  importEffectedNames: Map<string, Set<string>>;
+  importEffectedNames: Record<string, string[]> = {};
   // 是否有代码变更
-  isGitChange?: boolean;
+  isGitChange: boolean = false;
   // 是否有导入变更
-  isImportChange?: boolean;
+  isImportChange: boolean = false;
   // 是否有副作用变更
-  isSideEffectChange?: boolean;
-  constructor() {
-    this.exportEffectedNamesToReasons = new Map();
-    this.importEffectedNames = new Map();
-  }
+  isSideEffectChange: boolean = false;
+  constructor(
+    // 静态引入的文件列表
+    public importedIds: string[] = [],
+    // 动态引入的文件列表
+    public dynamicallyImportedIds: string[] = [],
+    // 被使用的导出
+    public renderedExports: string[] = [],
+    // 被treeshaking的导出
+    public removedExports: string[] = [],
+  ) {}
   // 添加导出影响以及原因（深度合并）
   addExportEffectedNameToReason(
     exportName: string,
     reason: {
       isNativeCodeChange?: boolean;
-      importEffectedNames?: Map<string, Set<string>>;
+      importEffectedNames?: Record<string, string[]>;
     },
   ) {
-    const { isNativeCodeChange = false, importEffectedNames = new Map() } =
-      reason;
+    const { isNativeCodeChange = false, importEffectedNames = {} } = reason;
     /* 如果存在该exportName，则深度合并传入数据和已有数据, 例如:
      { "a": { isNativeCodeChange: false, importEffectedNames: { "/user/b.ts": ["b1"] } } }} 
       + { "a": { isNativeCodeChange: true, importEffectedNames: { "/user/b.ts": ["b2"] } } }}
       => { "a": { isNativeCodeChange: true, importEffectedNames: { "/user/b.ts": ["b1","b2"] } } }
     */
     // 如果存在该exportName，则深度合并传入数据和已有数据
-    if (this.exportEffectedNamesToReasons.has(exportName)) {
+    if (this.exportEffectedNamesToReasons[exportName]) {
       const exportEffectedReason =
-        this.exportEffectedNamesToReasons.get(exportName);
+        this.exportEffectedNamesToReasons[exportName];
+      // 覆盖isNativeCodeChange
       exportEffectedReason.isNativeCodeChange = isNativeCodeChange;
-      importEffectedNames.forEach((value, key) => {
+      // 合并importEffectedNames
+      Object.entries(importEffectedNames).map(([source, importNames]) => {
         const importEffectedName =
-          exportEffectedReason.importEffectedNames.get(key);
+          exportEffectedReason.importEffectedNames[source];
+        // 如果存在该导入，则合并importName
         if (importEffectedName) {
-          value.forEach((v) => {
-            importEffectedName.add(v);
+          importNames.forEach((name) => {
+            // 合并需要去重
+            exportEffectedReason.importEffectedNames[source] = Array.from(
+              new Set([...importEffectedName, name]),
+            );
           });
         } else {
-          exportEffectedReason.importEffectedNames.set(key, value);
+          // 不存在该导入，则新增
+          exportEffectedReason.importEffectedNames[source] = importNames;
         }
       });
       return;
     }
     // 不存在该exportName，且参数有意义，则新增
-    if (isNativeCodeChange || importEffectedNames.size) {
-      this.exportEffectedNamesToReasons.set(exportName, {
+    if (isNativeCodeChange || importEffectedNames) {
+      this.exportEffectedNamesToReasons[exportName] = {
         isNativeCodeChange,
         importEffectedNames,
-      });
+      };
     }
   }
   // 记录有变化的导入
   addImportEffectedName(importId: string, importName: string) {
     // 存在该导入，直接添加importName
-    if (this.importEffectedNames.has(importId)) {
-      this.importEffectedNames.get(importId)?.add(importName);
+    const importEffectedNames = this.importEffectedNames[importId];
+    if (importEffectedNames) {
+      this.importEffectedNames[importId] = Array.from(
+        new Set([...importEffectedNames, importName]),
+      );
       return;
     }
-    // 不存在该导入，新增Set记录
-    this.importEffectedNames.set(importId, new Set([importName]));
-  }
-  // 将本节点的属性转化为可序列化的对象,主要是Map转对象，Set转数组
-  getSerializableNode() {
-    return deepClone({
-      isImportChange: this.isImportChange,
-      isGitChange: this.isGitChange,
-      isSideEffectChange: this.isSideEffectChange,
-      exportEffectedNamesToReasons: this.exportEffectedNamesToReasons,
-      importEffectedNames: this.importEffectedNames,
-    }) as unknown as ExportEffectedNodeSerializable;
+    // 不存在该导入，新增记录
+    this.importEffectedNames[importId] = [importName];
   }
 }
 
@@ -237,13 +249,28 @@ export function readFileSyncSafe(id: string) {
   return code;
 }
 
+function _getGitFilesModifiedByCommitHash(commitHash: string) {
+  const output = execSync(`git diff --name-only ${commitHash}`).toString();
+  return new Set(output.split("\n"));
+}
+export const getGitFilesModifiedByCommitHash = cacheReturn(
+  _getGitFilesModifiedByCommitHash,
+  (hash) => hash,
+);
+
 // 通过git判断文件是否修改
-export function isGitFileModified(filePath: string) {
+export function isGitFileModified(
+  filePath: string,
+  commitHash: string = "HEAD",
+) {
   try {
-    const output = execSync(
-      `git status --porcelain ${normalizeIdToFilePath(filePath)}`,
-    ).toString();
-    if (output) {
+    const gitRootPath = getGitRootPath();
+    const filesModified = getGitFilesModifiedByCommitHash(commitHash);
+    const gitFilePath = path.relative(
+      gitRootPath,
+      normalizeIdToFilePath(filePath),
+    );
+    if (filesModified.has(gitFilePath)) {
       return true;
     }
   } catch (e) {
@@ -253,13 +280,19 @@ export function isGitFileModified(filePath: string) {
 }
 
 // 通过git查询仓库根目录
-export function getGitRootPath() {
+function _getGitRootPath() {
+  let gitRootPath = "";
   try {
-    return execSync("git rev-parse --show-toplevel").toString().trim();
+    gitRootPath = execSync("git rev-parse --show-toplevel").toString().trim();
   } catch {
-    return process.cwd();
+    gitRootPath = process.cwd();
   }
+  return gitRootPath;
 }
+export const getGitRootPath = cacheReturn(
+  _getGitRootPath,
+  () => "getGitRootPath",
+);
 
 // 分块逻辑
 export async function sendDataByChunk(data: any[], path: string) {
@@ -285,7 +318,7 @@ export async function sendDataByChunk(data: any[], path: string) {
 export function postServerGraph(data: any[], path: string) {
   const options = {
     hostname: "localhost",
-    port: 2025,
+    port: 2027,
     path,
     method: "POST",
     headers: {
@@ -313,7 +346,6 @@ export function postServerGraph(data: any[], path: string) {
       req.write(jsonsToBuffer(data.map((item) => JSON.stringify(item))));
     }
 
-
     req.end();
   });
 }
@@ -324,7 +356,7 @@ export function cacheReturn<T extends (...args: any) => any>(
   createKey: (...args: Parameters<T>) => string,
 ) {
   const cache = new Map();
-  async function fn(...args: Parameters<T>): Promise<Awaited<ReturnType<T>>> {
+  function fn(...args: Parameters<T>): ReturnType<T> {
     const key = createKey(...args);
     if (cache.has(key)) {
       return cache.get(key);
@@ -401,10 +433,16 @@ export function deepClone<T>(target: T): T {
   return cloneData(target) as T;
 }
 
-// 合并环境配置和插件配
+// 合并环境配置和插件配置
 export function mergeOptions(options: PluginDepSpyConfig): PluginDepSpyConfig {
   return {
     commitHash: process.env[DEP_SPY_COMMIT_HASH],
     ...options,
-  }
+  };
+}
+
+// 绝对路径转化为基于项目根目录的相对路径
+export function importIdToRelativeId(id: string) {
+  const gitRootPath = getGitRootPath();
+  return id.replace(gitRootPath, "");
 }

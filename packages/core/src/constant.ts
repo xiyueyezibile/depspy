@@ -30,4 +30,7 @@ export const DEP_SPY_INJECT_MODE = "DEP_SPY_INJECT_MODE";
 export const DEP_SPY_COMMIT_HASH = "DEP_SPY_COMMIT_HASH";
 // 代码依赖树挂载在window上的变量名
 export const DEP_SPY_WINDOW_VAR = "__DEP_SPY_STATIC_TREE__";
-
+// 引入副作用的自定义变量名
+export const SIDE_EFFECT_NAME = "";
+// 全量引入的变量名
+export const ALL_EXPORT_NAME = "*"

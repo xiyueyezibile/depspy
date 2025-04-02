@@ -1,3 +1,5 @@
+import { ExportEffectedNode } from "./static/utils";
+
 export interface Node {
   name: string;
   version: string;
@@ -13,13 +15,6 @@ export interface Node {
   dependenciesList: Record<string, string>;
   size?: number;
   selfSize: number;
-}
-export interface StaticNode {
-  path: string;
-  resolvedPath: string;
-  imports: string[];
-  exports: string[];
-  dependencies: Record<string, StaticNode>;
 }
 export interface Config {
   depth?: number;
@@ -68,4 +63,20 @@ export interface PluginDepSpyConfig {
   commitHash?: string;
   // 忽略的插件名字
   ignorePlugins?:string[]
+  // 是否启用AST模式
+  enableAst?: boolean;
 }
+
+interface _StaticGraphNode extends ExportEffectedNode {
+  // 文件绝对路径
+  // importId: string;
+  // 文件相对路径
+  relativeId: string;
+  // 文件被哪些文件静态导入（避免内存过大，交给前端遍历时反向记录）
+  // 文件被哪些文件动态导入（避免内存过大，交给前端遍历时反向记录）
+}
+
+export type StaticGraphNode = Omit<
+  _StaticGraphNode,
+  "addExportEffectedNameToReason" | "addImportEffectedName"
+>;

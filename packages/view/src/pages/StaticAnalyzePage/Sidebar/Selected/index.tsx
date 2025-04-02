@@ -35,13 +35,12 @@ export const Selected = () => {
 
   useEffect(() => {
     if (!staticRoot || !highlightedNodeIds.size) return;
-    const rootPath = staticRoot.rootId;
-    const selectId = Array.from(highlightedNodeIds)[0].replace(rootPath, "");
+    const selectId = Array.from(highlightedNodeIds)[0];
     let res: SelectNodeInfo = null;
     traverseTree(staticRoot, (node) => {
       if (selectId === node.id) {
         res = {
-          name: node.name,
+          name: node.relativeId,
           removedExports: node.removedExports,
           renderedExports: node.renderedExports,
           exportEffectedNamesToReasons: node.exportEffectedNamesToReasons,

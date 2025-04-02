@@ -25,7 +25,9 @@ export default defineConfig(({ mode }) => {
     },
     envDir: "./env",
     plugins: [
-      vitePluginDepSpy(),
+      vitePluginDepSpy({
+        // enableAst: true,
+      }),
       reactPlugin(),
       UnoCSS(),
       generate404(),

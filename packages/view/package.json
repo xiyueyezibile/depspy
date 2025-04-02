@@ -1,6 +1,6 @@
 {
   "name": "@dep-spy/view",
-  "version": "2.2.1",
+  "version": "3.2.7",
   "description": "",
   "main": "./dist/tsup/index.js",
   "private": false,
@@ -37,7 +37,6 @@
     "@iconify-json/carbon": "^1.1.20",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
-    "@dep-spy/cli": "link:../cli",
     "@types/react": "^18.2.18",
     "@types/react-dom": "^18.2.7",
     "@unocss/preset-attributify": "^0.55.2",

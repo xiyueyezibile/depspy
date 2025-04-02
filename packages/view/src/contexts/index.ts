@@ -1,7 +1,7 @@
 import { shallow } from "zustand/shallow";
 import { createWithEqualityFn } from "zustand/traditional";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { Node, StaticStore, Store, StaticNode } from "~/types";
+import type { Node, StaticStore, Store, StaticTreeNode, StaticGraphNode } from "~/types";
 import { linkContext } from "./linkContext";
 import { searchNode } from "./searchNode";
 // import { StaticNode } from "@dep-spy/core";
@@ -92,6 +92,7 @@ export const useStore = createWithEqualityFn<Store>()(
 export const useStaticStore = createWithEqualityFn<StaticStore>()(
   subscribeWithSelector((set) => ({
     staticRootLoading: true,
+    staticGraph: null,
     staticRoot: null,
     highlightedNodeIds: new Set(),
     gitChangedNodes: new Set(),
@@ -108,7 +109,8 @@ export const useStaticStore = createWithEqualityFn<StaticStore>()(
       set({ importChangedNodes }),
     setHighlightedNodeIds: (highlightedNodeIds: Set<string>) =>
       set({ highlightedNodeIds }),
-    setStaticRoot: (staticRoot: StaticNode) => set({ staticRoot }),
+    setStaticGraph: (staticGraph: Map<string, StaticGraphNode>) => set({ staticGraph }),
+    setStaticRoot: (staticRoot: StaticTreeNode) => set({ staticRoot }),
     setStaticRootLoading: (staticRootLoading: boolean) =>
       set({ staticRootLoading }),
   })),

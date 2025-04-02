@@ -1,4 +1,4 @@
-// import { StaticNode } from "@dep-spy/core";
+import { StaticGraphNode as _StaticGraphNode } from "@dep-spy/core";
 
 export interface Node {
   name: string;
@@ -46,6 +46,23 @@ export interface StaticNode {
     [key: string]: string[];
   };
 }
+// 前端使用的图结构
+export interface StaticGraphNode extends _StaticGraphNode{
+  importers: Set<string>;
+  dynamicImporters:Set<string>;
+}
+
+// 用于前端视图渲染的结构
+export interface StaticTreeNode extends StaticGraphNode{
+  // 路径 + 出现次数
+  id:string;
+  // 子节点
+  children: StaticTreeNode[];
+  // 从根节点到当前节点的路径数组
+  paths:string[];
+}
+
+
 
 export interface generateGraphRes {
   root?: Node;
@@ -86,7 +103,8 @@ export interface Store {
 }
 
 export interface StaticStore {
-  staticRoot: StaticNode;
+  staticRoot: StaticTreeNode;
+  staticGraph:Map<string, StaticGraphNode>;
   staticRootLoading: boolean;
   highlightedNodeIds: Set<string>;
   gitChangedNodes: Set<string>;
@@ -98,6 +116,7 @@ export interface StaticStore {
   setGitChangedNodes: (nodeIds: Set<string>) => void;
   setImportChangedNodes: (nodeIds: Set<string>) => void;
   setHighlightedNodeIds: (nodeIds: Set<string>) => void;
-  setStaticRoot: (staticRoot: StaticNode) => void;
+  setStaticRoot: (staticRoot: StaticTreeNode) => void;
+  setStaticGraph: (staticRoot: Map<string, StaticGraphNode>) => void;
   setStaticRootLoading: (staticRootLoading: boolean) => void;
 }

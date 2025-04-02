@@ -6,9 +6,11 @@ import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
 import {
   createServer as createStaticServer,
+  outPutPath,
   outPutUrl,
 } from "./static/createServer";
 import { exec } from "child_process";
+import { addLogFile } from "./utils";
 const cli = cac();
 // 包依赖
 cli
@@ -117,16 +119,18 @@ cli
         console.log(red("构建命令执行错误"));
         console.error(error);
       }
-      // 命令执行的输出
-      console.log(std);
+      // 写入命令执行的输出作为日志
       spinner.stop();
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
-      // vite插件运行完毕，数据已经发送完毕，可以展示web页面
-      outPutUrl();
       // 注入模式不需要开发服务器，直接退出
       if (options.inject) {
+        outPutPath()
         process.exit(0);
       }
+      // vite插件运行完毕，数据已经发送完毕，可以展示web页面
+      outPutUrl();
+      // 添加日志信息
+      addLogFile(std)
     });
   });
 

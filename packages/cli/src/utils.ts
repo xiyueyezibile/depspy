@@ -1,6 +1,9 @@
 import { Response } from "express";
 import { Node } from "@dep-spy/core";
 import { compose, toInfinity, limitDepth, jsonsToBuffer } from "@dep-spy/utils";
+import fs from "fs";
+import path from "path";
+import { staticPath } from "@dep-spy/view";
 
 export function successHandler(res: Response, data: unknown) {
   res.send({
@@ -38,4 +41,8 @@ export function generateNodeJsons(nodes: Node[]) {
 export function nodesToBuffer(nodes: Node[]) {
   const nodeJsons = generateNodeJsons(nodes);
   return jsonsToBuffer(nodeJsons);
+}
+export function addLogFile(std:string){
+  const filePath = path.join(staticPath,"log.txt");
+  fs.writeFileSync(filePath,std);
 }

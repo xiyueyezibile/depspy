@@ -3,7 +3,7 @@ import { DEP_SPY_SUB_START } from "../constant";
 import { findSourceToImportsFormAst, normalizeIdToFilePath } from "./utils";
 import path from "path";
 // 获取指定导出真正依赖的源码和真正依赖的引入（复用vite的treeshaking规范）
-interface GetTreeShakingDetailOptions {
+export interface GetTreeShakingDetailOptions {
   // vite文件id，可能是绝对路径，也可能是虚拟路径
   entry: string;
   // 源码
@@ -13,7 +13,7 @@ interface GetTreeShakingDetailOptions {
   // 忽略的插件
   ignorePlugins?:string[],
 }
-interface GetTreeShakingDetailResult {
+export interface GetTreeShakingDetailResult {
   // treeshaking后的代码
   treeShakingCode: string;
   // 依赖的源码的引入路径和对应引入的变量，例如：{ "./a": ["a","b","default"] }
@@ -181,6 +181,9 @@ function constructImportStatement(importedId: string, importName: string) {
   // 处理命名空间导入
   if (importName === "*") {
     return `import * as all from '${importedId}';console.log(all);`;
+  }
+  if(importName === ""){
+    return `import '${importedId}';`;
   }
   // 处理具名导入
   return `import { ${importName} } from '${importedId}';console.log(${importName});`;

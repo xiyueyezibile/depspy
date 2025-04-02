@@ -7,7 +7,7 @@
 最基本的配置文件是这样的:
 
 ```javascript
-import { defineConfig } from "@dep-spy/cli";
+import { defineConfig } from "@tencent/dep-spy/cli";
 
 export default defineConfig({
   // config options

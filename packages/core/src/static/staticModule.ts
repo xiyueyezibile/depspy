@@ -41,16 +41,15 @@ interface ModuleTree {
   // 该文件哪些导出被使用
   renderedExports: string[];
   // 该文件的哪些导出有改动
-  exportEffectedNamesToReasons: ExportEffectedNodeSerializable["exportEffectedNamesToReasons"];
+  exportEffectedNamesToReasons: ExportEffectedNode["exportEffectedNamesToReasons"];
   // 该文件的哪些导入有改动, 例如 { './a': ['a','default'] }
-  importEffectedNames: ExportEffectedNodeSerializable["importEffectedNames"];
+  importEffectedNames: ExportEffectedNode["importEffectedNames"];
 }
 
 class Module {
   id: string;
   importedIds: Module[] = [];
   dynamicallyImportedIds: Module[] = [];
-  circleModules = new Map<string, Module[]>();
   constructor(
     id: string,
     public renderedExports: string[] = [],
@@ -78,10 +77,9 @@ class ModuleGraph {
   constructor(
     public entryId: string,
     public allExportEffected: Map<string, ExportEffectedNode>,
-    public allModules = new Map<string, ModuleInfo | null>(),
   ) {
     this.rootId = getGitRootPath();
-    this.allModules.forEach((info, id) => {
+    this.allExportEffected.forEach((info, id) => {
       this.graph.set(
         id,
         new Module(id, info.renderedExports, info.removedExports),
@@ -133,50 +131,6 @@ class ModuleGraph {
           .filter(Boolean);
       }
     });
-  }
-  /** 分析并标记循环依赖 */
-  analysisCircleModule(
-    entryId: string = this.entryId,
-    matchModules: Module[] | null = null,
-  ) {
-    if (this.graph.has(entryId)) {
-      // 发现循环依赖
-      if (
-        matchModules &&
-        matchModules.length &&
-        ModuleGraph.hasDuplicate(matchModules)
-      ) {
-        const circleModule = ModuleGraph.getDuplicate(matchModules);
-        if (circleModule) {
-          const firstModules = ModuleGraph.subarrayFromFirstMatch(
-            circleModule,
-            matchModules,
-          );
-          const key = firstModules.map((it) => it.id).join("&");
-
-          // 去重
-          if (!circleModule.circleModules.has(key))
-            circleModule.circleModules.set(key, firstModules);
-        }
-        // logCircleModules(circleModule.circleModules)
-        return;
-      }
-      const rootModule = this.graph.get(
-        matchModules && matchModules.length
-          ? matchModules[matchModules.length - 1].id
-          : entryId,
-      );
-      const importedIds = rootModule.importedIds;
-      const dynamicallyImportedIds = rootModule.dynamicallyImportedIds;
-      const allImportedIds = [...importedIds, ...dynamicallyImportedIds];
-      // 多叉树深度优先遍历
-      allImportedIds.forEach((module) => {
-        this.analysisCircleModule(
-          entryId,
-          matchModules ? [...matchModules, module] : [rootModule, module],
-        );
-      });
-    }
   }
   /** 收集函数粒度更改影响的文件 */
   collectedEntryAndExportToFileNames(
@@ -241,7 +195,6 @@ class ModuleGraph {
     // 获取该节点的exportEffect
     const exportEffect = this.allExportEffected
       .get(entryId)
-      ?.getSerializableNode();
 
     const tree: ModuleTree = {
       parentId: parent ? `${parent.pathId}-${parent.id}` : undefined,
@@ -275,10 +228,10 @@ class ModuleGraph {
     parent: ModuleTree | null = null,
   ): ModuleTree | null {
     const tree: ModuleTree = this.initTreeNodeData(entryId, parent);
-    const changedExports = Object.entries(tree.exportEffectedNamesToReasons);
-    if (changedExports.length > 0) {
-      this.collectedEntryAndExportToFileNames(entryId, changedExports);
-    }
+    // const changedExports = Object.entries(tree.exportEffectedNamesToReasons);
+    // if (changedExports.length > 0) {
+    //   this.collectedEntryAndExportToFileNames(entryId, changedExports);
+    // }
 
     if (!parent) tree.rootId = this.rootId;
 
@@ -357,43 +310,13 @@ export class Bundle {
       this.sourceToImportIdMap,
       this.getModuleInfo,
     );
-    // 收集所有的模块
-    const allModules = this.collectAllModules(this.options.entry);
     // 构建依赖树
     this.moduleGraph = new ModuleGraph(
       this.options.entry,
       this.allExportEffected,
-      allModules,
     );
     /** 根据导入导出关系构建模块依赖图（根据上述设置的信息进行构建） */
     this.moduleGraph.buildGraph();
-    /** 分析并标记循环依赖 */
-    this.moduleGraph.analysisCircleModule();
     return this.moduleGraph;
-  }
-  // 搜集项目所有的引入模块的信息，包括动态引入
-  private collectAllModules(importId: string) {
-    const info = this.getModuleInfo(importId);
-    this.allModules.set(importId, info);
-    [
-      ...(info?.importedIds || []),
-      ...(info?.dynamicallyImportedIds || []),
-    ].forEach((id) => {
-      /*
-        1. 以allExportEffected为准
-        2. 排出三方包
-        3. 排除已经搜集过的importId的
-      */
-      if (
-        !this.allExportEffected.has(id) ||
-        idInExternals(id) ||
-        this.allModules.has(id)
-      ) {
-        return;
-      }
-      // 递归搜集子importId
-      this.collectAllModules(id);
-    });
-    return this.allModules;
   }
 }

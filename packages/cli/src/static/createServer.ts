@@ -6,8 +6,11 @@ import { createHttp } from "./createHttp";
 import { MODE } from "../constants";
 
 const root = path.join(staticPath, MODE.OFFLINE);
-const port = 2025;
+const port = 2027;
 const url = `http://localhost:${port}/static-analyze`;
+
+// 注入模式下，静态资源目录
+const injectRoot = path.join(staticPath, MODE.INJECT);
 
 export function createServer() {
   const app = express();
@@ -20,4 +23,8 @@ export function createServer() {
 }
 export function outPutUrl() {
   console.log(green("服务器启动成功:"), blueBright(url));
+}
+
+export function outPutPath() {
+  console.log(green("静态资源目录:"), blueBright(injectRoot));
 }

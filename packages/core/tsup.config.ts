@@ -6,6 +6,7 @@ export default defineConfig({
     "src/threadsPool/worker.ts",
     "src/static/vitePluginDepSpy.ts",
     "src/static/webpackPluginDepSpy.ts",
+    "src/threadsPool/getTreeShakingDetailThread.ts"
   ],
   publicDir: "public",
   external: ["vite", "rollup"],

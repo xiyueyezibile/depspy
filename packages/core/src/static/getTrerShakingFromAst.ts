@@ -316,15 +316,6 @@ export function extractDependencyRelation(node: ts.SourceFile) {
     innerDeclarationIdentifiers: string[] = [],
     deps: string[] = [],
   ) => {
-    // console.log(new Array(depth + 1).join('----'),
-    //   ts.SyntaxKind[node.kind],
-    //   node.pos,
-    //   node.end,
-    //   node.kind === ts.SyntaxKind.Identifier ? node.getText() : '',
-    //   node.kind === ts.SyntaxKind.VariableDeclarationList ? node.getText() : '',
-    //   node.kind === ts.SyntaxKind.ConstKeyword ? node.getText() : '',
-    //   node.kind === ts.SyntaxKind.VariableDeclaration ? node.getText() : ''
-    // );
 
     let curInnerDeclaration = innerDeclaration;
 

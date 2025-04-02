@@ -22,7 +22,7 @@
 将 DepSpy 安装到项目，使用 `PNPM`：
 
 ```bash
-$ pnpm add @dep-spy/cli -D
+$ pnpm add @tencent/dep-spy/cli -D
 ```
 
 之后你可以在 `npm` 脚本添加使用 `ds` 或者 `depspy` 脚本，以下是推荐配置脚本：
@@ -46,7 +46,7 @@ $ pnpm run ds
 
 ![ui](https://cheerioinf-img.oss-cn-beijing.aliyuncs.com/img/image-20230828225639712%202.png)
 
-推荐使用上述方法，但也支持使用 `npx @dep-spy/cli` 来直接运行 DepSpy。
+推荐使用上述方法，但也支持使用 `npx @tencent/dep-spy/cli` 来直接运行 DepSpy。
 
 ### 线上查询
 
@@ -65,7 +65,7 @@ $ pnpm run ds
 最基本的配置文件是这样的
 
 ```javascript
-import { defineConfig } from "@dep-spy/cli";
+import { defineConfig } from "@tencent/dep-spy/cli";
 
 export default defineConfig({
   // config options
@@ -150,11 +150,11 @@ DepSpy 中，我们默认展示声明依赖版本，当我们 `hover` 到树状�
 - 引入
 
 ```bash
-  pnpm add @dep-spy/core
+  pnpm add @tencent/dep-spy/core
 ```
 
 ```javascript
-import { generateGraph } from "@dep-spy/core";
+import { generateGraph } from "@tencent/dep-spy/core";
 ```
 
 - 生成 `Graph` 对象

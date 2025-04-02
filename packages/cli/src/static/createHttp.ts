@@ -28,7 +28,6 @@ export function createHttp(app: Express) {
         });
         // 最后一个chunk再将数据注入到html
         if (req.query?.end && process.env[DEP_SPY_INJECT_MODE]) {
-          console.log(111,process.env[DEP_SPY_INJECT_MODE])
           // 设置数组到html
           injectData(JSON.stringify(parseNodeBuffer(Buffer.concat(bufferArr).buffer)));
         }

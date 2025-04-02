@@ -5,11 +5,11 @@
 - 引入
 
 ```bash
-  pnpm add @dep-spy/core
+  pnpm add @tencent/dep-spy/core
 ```
 
 ```javascript
-import { generateGraph } from "@dep-spy/core";
+import { generateGraph } from "@tencent/dep-spy/core";
 ```
 
 - 生成 `Graph` 对象

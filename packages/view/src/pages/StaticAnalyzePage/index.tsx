@@ -6,48 +6,48 @@ import { useStaticStore } from "@/contexts";
 import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import Tool from "./Tool";
-import { traverseTree, buildTree } from "./utils";
+import {
+  handleGraphNodes,
+  renderTreeByGraphId,
+} from "./utils";
 import { getStaticGraph } from "@/contexts/api";
 
 export default function StaticAnalyzePage() {
   const {
     staticRootLoading,
     staticRoot,
-    setStaticRoot,
+    staticGraph,
+    setStaticGraph,
     setGitChangedNodes,
     setImportChangedNodes,
   } = useStaticStore();
 
-  async function init() {
-    const moduletree = await getStaticGraph();
-    const tree = buildTree(moduletree);
-    setStaticRoot(tree);
+  async function initStaticGraph() {
+    const staticGraph = await getStaticGraph();
+    const { gitChangeSet, importChangeSet, graph } =
+      handleGraphNodes(staticGraph);
+    setStaticGraph(graph);
+    setGitChangedNodes(gitChangeSet);
+    setImportChangedNodes(importChangeSet);
+    // 默认渲染第一个节点,等待数据就绪再渲染
+    setTimeout(()=>{
+      renderTreeByGraphId(gitChangeSet.keys().next().value,undefined,true);
+    },0)
+   
   }
+
   useEffect(() => {
-    init();
+    initStaticGraph()
   }, []);
 
   useEffect(() => {
     if (!staticRoot) return;
     if (staticRoot) {
-      //初始化git变更文件 导入变更文件
-      const gitChangeSet = new Set<string>();
-      const importChangeSet = new Set<string>();
-      const rootPath = staticRoot.rootId;
-      traverseTree(staticRoot, (node) => {
-        if (node.isGitChange) {
-          gitChangeSet.add(rootPath + node.id);
-        }
-        if (node.isImportChange) {
-          importChangeSet.add(rootPath + node.id);
-        }
-      });
-      setGitChangedNodes(gitChangeSet);
-      setImportChangedNodes(importChangeSet);
+      renderTreeByGraphId(staticRoot.relativeId);
     }
-  }, [staticRoot]);
+  }, [staticGraph]);
 
-  if (staticRootLoading && !staticRoot) {
+  if (staticRootLoading && !staticGraph) {
     return <Skeleton></Skeleton>;
   }
   return (
@@ -55,9 +55,9 @@ export default function StaticAnalyzePage() {
       <div className="fixed">
         <StaticTree />
       </div>
-      <div className="fixed left-0 bottom-0">
+      {/* <div className="fixed left-0 bottom-0">
         <Tool />
-      </div>
+      </div> */}
       <div className="fixed -z-50 bg-bg-container">
         <GridBackground></GridBackground>
       </div>

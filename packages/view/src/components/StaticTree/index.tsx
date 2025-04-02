@@ -6,6 +6,7 @@ import { shallow } from "zustand/shallow";
 import { State, COLOR } from "./constant";
 import { deepClone } from "@/utils/deepClone";
 import { throttle } from "@/utils/throttle";
+import { extractFileName } from "@/pages/StaticAnalyzePage/utils";
 
 export default function StaticTree() {
   const {
@@ -42,7 +43,6 @@ export default function StaticTree() {
   const [circleMap, setCircleMap] = useState(new Map());
   const highlightedNodeIdsRef = useRef(highlightedNodeIds);
   const containerRef = useRef<HTMLDivElement>();
-  const rootPath = staticRoot.rootId;
   const showGitChangedNodesRef = useRef(showGitChangedNodes);
   const showImportChangedNodesRef = useRef(showImportChangedNodes);
   const gitChangedNodesRef = useRef(gitChangedNodes);
@@ -129,7 +129,7 @@ export default function StaticTree() {
             // must be assigned in G6 3.3 and later versions. it can be any string you want, but should be unique in a custom item type
             name: "rect-shape",
           });
-          const content = textOverflow(cfg.name, 100);
+          const content = textOverflow(extractFileName(cfg.relativeId as string), 100);
           const text = group.addShape("text", {
             attrs: {
               text: content,
@@ -263,115 +263,139 @@ export default function StaticTree() {
 
   // 用于展开节点
   const expandNode = useCallback(
-    (id: string, flag: boolean) => {
-      if (!graphRef.current)
-        return new Promise((resolve) => {
-          resolve(1);
-        });
-      return new Promise((resolve) => {
-        const matrix = graphRef.current.getGroup().getMatrix();
+    (item: G6.Node, flag: boolean) => {
+      if (!graphRef.current) return;
+      const model = item.getModel();
+      if (!model.collapsed) return;
+      const matrix = graphRef.current.getGroup().getMatrix();
 
-        const zoom = graphRef.current.getZoom();
-        const offsetX = matrix[6] / zoom;
-        const offsetY = matrix[7] / zoom;
+      const zoom = graphRef.current.getZoom();
+      const offsetX = matrix[6] / zoom;
+      const offsetY = matrix[7] / zoom;
 
-        const item = graphRef.current.findById(id) as G6.Node;
-        if (item) {
-          //如果直接在图里面找到到节点，并且节点是折叠状态，则展开该节点
-          const model = item.getModel();
-          if (!model.collapsed) resolve(1);
-          graphRef.current.updateItem(item, {
-            collapsed: !flag,
-          });
-        } else {
-          G6.Util.traverseTree(cloneData, (node) => {
-            if (node.id === id) {
-              node.path.forEach((path) => {
-                //TODO: 建立一个id => node状态的映射，从而减少不必要的expand
-                expandNode(path, true);
-              });
-            }
+      graphRef.current.updateItem(item, {
+        collapsed: !flag,
+      });
+      graphRef.current.changeData(cloneData);
+      circleMap.forEach((k, v) => {
+        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
+          graphRef.current.addItem("edge", {
+            source: k,
+            target: v,
+            type: "circle-line",
           });
         }
-        graphRef.current.changeData(cloneData);
-        circleMap.forEach((k, v) => {
-          if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-            graphRef.current.addItem("edge", {
-              source: k,
-              target: v,
-              type: "circle-line",
-            });
-          }
-        });
-        //保持在展开折叠后树节点位置不变
-        graphRef.current.translate(offsetX, offsetY);
-        graphRef.current.zoom(zoom);
-        graphRef.current.refresh();
-        refreshGitAndImportChangedNodes();
-        setTimeout(() => {
-          resolve(true);
-        }, 0);
       });
+      //保持在展开折叠后树节点位置不变
+      graphRef.current.translate(offsetX, offsetY);
+      graphRef.current.zoom(zoom);
+      graphRef.current.refresh();
+      refreshGitAndImportChangedNodes();
     },
     [graphRef, cloneData, circleMap],
   );
 
+  const expandNodeSequentially = useCallback(
+    async (id: string) => {
+      const rawItem = graphRef.current.findById(id) as G6.Node;
+
+      // 处理节点展开逻辑
+      if (rawItem) {
+        //如果图里能找到节点，则展开节点并等待渲染完成
+        expandNode(rawItem, true);
+        // 等待一帧确保渲染完成
+        // await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } else {
+        // 如果找不到节点，则遍历数据查找路径，展开路径节点
+        let path: string[] = [];
+        G6.Util.traverseTree(cloneData, (node) => {
+          if (node.id === id) {
+            path = [...node.path];
+            return false;
+          }
+          return true;
+        });
+
+        const updatedIds = new Set<string>();
+        if (path.length) {
+          for (const pid of path) {
+            if (!updatedIds.has(pid)) {
+              const rawPathItem = graphRef.current.findById(pid) as G6.Node;
+              if (rawPathItem) {
+                expandNode(rawPathItem, true);
+                // 每个路径节点展开后都等待渲染
+                // await new Promise((resolve) => requestAnimationFrame(resolve));
+                await new Promise((resolve) => setTimeout(resolve, 0));
+              }
+              updatedIds.add(pid);
+            }
+          }
+        }
+      }
+
+      // 额外等待确保高亮效果渲染
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+    [graphRef.current, expandNode, highlightedNodeIds],
+  );
+
   const highlightNodesSequentially = useCallback(async () => {
     for (const id of highlightedNodeIds) {
-      //展开逻辑
-      await expandNode(id, true);
+      await expandNodeSequentially(id);
     }
-
     for (const id of highlightedNodeIds) {
       // 处理高亮逻辑
       const item = graphRef.current.findById(id) as G6.Node;
-      if (item) {
-        const relatedEdges = item.getEdges() || [];
-        graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
-        graphRef.current.refreshItem(item);
+      if (!item) return;
 
-        relatedEdges.forEach((edge) => {
-          const {
-            _cfg: { currentShape },
-          } = edge;
-          if (currentShape === "custom-polyline") {
+      const relatedEdges = item.getEdges() || [];
+      graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
+      graphRef.current.refreshItem(item);
+
+      relatedEdges.forEach((edge) => {
+        const {
+          _cfg: { currentShape },
+        } = edge;
+        if (currentShape === "custom-polyline") {
+          graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
+          graphRef.current.refreshItem(edge);
+        } else {
+          //判断当前节点是否是起点
+          if (edge.getSource().getModel().id === item.getModel().id) {
             graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
             graphRef.current.refreshItem(edge);
-          } else {
-            //判断当前节点是否是起点
-            if (edge.getSource().getModel().id === item.getModel().id) {
-              graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
-              graphRef.current.refreshItem(edge);
-            }
           }
-        });
-      }
+        }
+      });
     }
-  }, [highlightedNodeIds, graphRef.current]);
+  }, [highlightedNodeIds, graphRef.current, expandNodeSequentially]);
 
   useEffect(() => {
+    if(!staticRoot)return;
     const newData = deepClone(staticRoot);
     const map = new Map();
     //转换为g6的数据格式
     G6.Util.traverseTree(newData, (subTree) => {
-      if (new Set(subTree.path).size !== subTree.path.length) {
-        for (let i = 0; i < subTree.idpath.length; i++) {
-          if (subTree.path[i] === subTree.pathId) {
-            const id = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
+      // const subTree:StaticTreeNode = _subTree;
+      // if (new Set(subTree.path).size !== subTree.path.length) {
+      //   for (let i = 0; i < subTree.idpath.length; i++) {
+      //     if (subTree.path[i] === subTree.pathId) {
+      //       const id = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
 
-            map.set(id, rootPath + subTree.id);
-          }
-        }
-      }
-      subTree.id = rootPath + subTree.id;
+      //       map.set(id, rootPath + subTree.id);
+      //     }
+      //   }
+      // }
+      // subTree.id = rootPath + subTree.id;
       //初始化折叠状态
-      subTree.collapsed = subTree.depth >= 2 ? true : false;
-      for (let i = 0; i < subTree.path.length; i++) {
-        subTree.path[i] = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
-      }
+      subTree.collapsed = subTree.paths.length >= 2 ? true : false;
+      // for (let i = 0; i < subTree.path.length; i++) {
+      //   subTree.path[i] = rootPath + subTree.path[i] + "-" + subTree.idpath[i];
+      // }
       return true;
     });
-    setCloneData(newData);
+    setCloneData(newData as any);
     setCircleMap(map);
   }, [staticRoot]);
 
@@ -385,7 +409,7 @@ export default function StaticTree() {
         const model = e.item._cfg.model;
         const outDiv = document.createElement("div");
         outDiv.style.width = "fit-content";
-        outDiv.innerHTML = model.pathId as string;
+        outDiv.innerHTML = model.relativeId as string;
         return outDiv;
       },
       itemTypes: ["node"],
@@ -454,7 +478,7 @@ export default function StaticTree() {
         type: "compactBox",
         direction: "LR",
         getId: function getId(d) {
-          return rootPath + d.pathId + "-" + d.id;
+          return d.id;
         },
         getVGap: function getVGap() {
           return 0;
