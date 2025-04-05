@@ -3,8 +3,8 @@ import { GetModuleInfo, PluginDepSpyConfig } from "../type";
 import type { Compilation, Compiler, Module } from "@rspack/core";
 import { sendDataByChunk, SourceToImportId } from "./utils";
 import { DEP_SPY_START, DEP_SPY_WEBPACK_BUILD } from "../constant";
-import { Bundle } from "./staticModule";
-import { writeFileSync } from "fs";
+import getAllExportEffect from "./getAllExportEffected";
+import { StaticGraph } from "./staticGraph";
 
 export class rspackPluginDepSpy {
   constructor(
@@ -75,11 +75,10 @@ export class rspackPluginDepSpy {
 
             if (mode === "esm" || mode === "cjs") {
               const relativePathByImported = reason.userRequest; // 被导入模块的相对名字
-              
-              const absolutePathByImporter = reason.resolvedModule? path.resolve(
-                context,
-                reason.resolvedModule,
-              ): path.resolve(context, reason.moduleName); // 导入模块的绝对名字
+
+              const absolutePathByImporter = reason.resolvedModule
+                ? path.resolve(context, reason.resolvedModule)
+                : path.resolve(context, reason.moduleName); // 导入模块的绝对名字
               this.sourceToImportIdMap.addRecord(
                 relativePathByImported,
                 absolutePathByImporter,
@@ -135,18 +134,16 @@ export class rspackPluginDepSpy {
         };
         // 生成依赖树
         try {
-          const globalBundle = new Bundle(
+          const allExportEffected = await getAllExportEffect(
             this.options,
             this.sourceToImportIdMap,
             getModuleInfo,
           );
-          const moduleGraph = await globalBundle.generateModuleGraph();
-          /** 生成铺平的树 */
-          const flatTree = moduleGraph.generateTiledTreeByRootId();
-          
-          await sendDataByChunk(flatTree, "/collectBundle");
-          const jsonPath = path.join(process.cwd(), "moduleTree.json");
-          writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
+          // 生成依赖图
+          const staticGraph = new StaticGraph(this.options, allExportEffected);
+          const graph = staticGraph.generateGraph();
+          // 分块发送数据给服务器
+          await sendDataByChunk(Object.values(graph), "/collectBundle");
         } catch (error) {
           console.log("bundle error", error);
         }
