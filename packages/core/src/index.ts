@@ -6,6 +6,6 @@ export {
   DEP_SPY_INJECT_MODE,
   DEP_SPY_COMMIT_HASH,
   DEP_SPY_WINDOW_VAR,
-  SIDE_EFFECT_NAME
+  SIDE_EFFECT_NAME,
 } from "./constant";
 export type { Graph } from "./dep/graph";

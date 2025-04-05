@@ -1,7 +1,12 @@
 import cac from "cac";
 import ora from "ora";
 import { blue, green, yellow, red } from "chalk";
-import { generateGraph, DEP_SPY_START,DEP_SPY_INJECT_MODE, DEP_SPY_COMMIT_HASH } from "@dep-spy/core";
+import {
+  generateGraph,
+  DEP_SPY_START,
+  DEP_SPY_INJECT_MODE,
+  DEP_SPY_COMMIT_HASH,
+} from "@dep-spy/core";
 import { conformConfig } from "./conformConfig";
 import { createServer } from "./server/createServer";
 import {
@@ -9,7 +14,7 @@ import {
   outPutPath,
   outPutUrl,
 } from "./static/createServer";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { addLogFile } from "./utils";
 const cli = cac();
 // 包依赖
@@ -124,15 +129,75 @@ cli
       console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
       // 注入模式不需要开发服务器，直接退出
       if (options.inject) {
-        outPutPath()
+        outPutPath();
         process.exit(0);
       }
       // vite插件运行完毕，数据已经发送完毕，可以展示web页面
       outPutUrl();
       // 添加日志信息
-      addLogFile(std)
+      addLogFile(std);
     });
+    // 带参数模式
+    // spawnCommand(options, startTime);
   });
 
 cli.help();
 cli.parse();
+
+function spawnCommand(options: any, startTime: number) {
+  // 分割命令和参数
+  const [cmd, ...args] = options.command.split(/\s+/);
+
+  const child = spawn(cmd, args, {
+    cwd: process.cwd(),
+    stdio: "pipe",
+    shell: true,
+  });
+
+  let stdOutput = "";
+  let stdError = "";
+
+  // 实时输出 stdout
+  child.stdout.on("data", (data) => {
+    const output = data.toString();
+    stdOutput += output;
+    process.stdout.write(output); // 实时打印输出
+  });
+
+  // 实时输出 stderr
+  child.stderr.on("data", (data) => {
+    const error = data.toString();
+    stdError += error;
+    process.stderr.write(error); // 实时打印错误
+  });
+
+  child.on("close", (code) => {
+    // spinner.stop();
+
+    if (code !== 0) {
+      console.log(red("构建命令执行错误"));
+      console.error(stdError);
+      return;
+    }
+
+    console.log(green(`破解完成,耗时 ${yellow(Date.now() - startTime)} ms`));
+
+    // 注入模式不需要开发服务器，直接退出
+    if (options.inject) {
+      outPutPath();
+      process.exit(0);
+    }
+
+    // vite插件运行完毕，数据已经发送完毕，可以展示web页面
+    outPutUrl();
+
+    // 添加日志信息（合并 stdout 和 stderr）
+    addLogFile(stdOutput + stdError);
+  });
+
+  child.on("error", (error) => {
+    // spinner.stop();
+    console.log(red("构建命令执行错误"));
+    console.error(error);
+  });
+}

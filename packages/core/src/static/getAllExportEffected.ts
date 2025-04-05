@@ -14,7 +14,11 @@ import {
 } from "./utils";
 import { getTreeShakingDetail as _getTreeShakingDetail } from "./getTreeShakingDetail";
 import { ModuleInfo, PluginDepSpyConfig } from "../type";
-import { ALL_EXPORT_NAME, DEP_SPY_VITE_BUILD, SIDE_EFFECT_NAME } from "../constant";
+import {
+  ALL_EXPORT_NAME,
+  DEP_SPY_VITE_BUILD,
+  SIDE_EFFECT_NAME,
+} from "../constant";
 import { getTreeShakingDetailFromAst } from "./getTrerShakingFromAst";
 
 // 只处理包含JS逻辑的文件类型
@@ -174,7 +178,7 @@ async function _getAllExportEffect(
   if (ext !== ".html") {
     // 遍历当前文件的导出，判断各个导出是否有变动
     // 空字符是模拟副作用导入的情况，比如 import "dayjs"
-    currentInfo?.renderedExports
+    (currentInfo?.renderedExports || [])
       .concat(SIDE_EFFECT_NAME)
       ?.forEach((exportName: string) => {
         const curTreeShakingCodePromise = getTreeShakingDetail({
@@ -223,7 +227,9 @@ async function _getAllExportEffect(
                 if (
                   sourceExportEffect?.exportEffectedNamesToReasons[_import] ||
                   (_import === ALL_EXPORT_NAME &&
-                    Object.keys(sourceExportEffect?.exportEffectedNamesToReasons).length) ||
+                    Object.keys(
+                      sourceExportEffect?.exportEffectedNamesToReasons,
+                    ).length) ||
                   sourceExportEffect.isSideEffectChange
                 ) {
                   // 对应importId的相对路径
@@ -254,7 +260,10 @@ async function _getAllExportEffect(
               sourceToImportIdMap.getImportIdBySource(source, entry) || "";
             // 动态引入的文件是否有导出受到影响
             const hasExportEffected = Boolean(
-              Object.keys(importIdToExportEffected.get(importId)?.exportEffectedNamesToReasons || {}).length
+              Object.keys(
+                importIdToExportEffected.get(importId)
+                  ?.exportEffectedNamesToReasons || {},
+              ).length,
             );
             // 如果动态引入有变化，则该导出受到影响
             if (hasExportEffected) {
