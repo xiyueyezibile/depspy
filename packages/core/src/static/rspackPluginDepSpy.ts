@@ -75,11 +75,11 @@ export class rspackPluginDepSpy {
 
             if (mode === "esm" || mode === "cjs") {
               const relativePathByImported = reason.userRequest; // 被导入模块的相对名字
-
-              const absolutePathByImporter = path.resolve(
+              
+              const absolutePathByImporter = reason.resolvedModule? path.resolve(
                 context,
                 reason.resolvedModule,
-              ); // 导入模块的绝对名字
+              ): path.resolve(context, reason.moduleName); // 导入模块的绝对名字
               this.sourceToImportIdMap.addRecord(
                 relativePathByImported,
                 absolutePathByImporter,
@@ -143,6 +143,7 @@ export class rspackPluginDepSpy {
           const moduleGraph = await globalBundle.generateModuleGraph();
           /** 生成铺平的树 */
           const flatTree = moduleGraph.generateTiledTreeByRootId();
+          
           await sendDataByChunk(flatTree, "/collectBundle");
           const jsonPath = path.join(process.cwd(), "moduleTree.json");
           writeFileSync(jsonPath, moduleGraph.stringifyTreeByRootId());
